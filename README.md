@@ -32,6 +32,7 @@
 - ✅ **동시성 처리**: Goroutine 및 Context 기반 동시 요청 처리
 - ✅ **연결 풀링**: MongoDB, Vitess, Redis 연결 풀 최적화
 - ✅ **분산 캐싱**: Redis 기반 캐시 히트율 향상
+- ✅ **Multi-tenancy**: 테넌트 격리, API Key 인증, Quota 관리, 4가지 Plan 지원
 
 ### 보안
 - ✅ **Vault 동적 자격증명**: MongoDB, Vitess 사용자 자동 생성/로테이션/삭제
@@ -43,7 +44,8 @@
 - ✅ **구조화된 로깅**: Zap logger 기반 JSON 구조화 로그
 - ✅ **분산 추적**: OpenTelemetry + Jaeger 통합
 - ✅ **메트릭 수집**: Prometheus 메트릭 (요청률, 에러율, 지연시간, 캐시 히트율 등)
-- ✅ **대시보드**: Grafana 대시보드 지원
+- ✅ **AlertManager**: 100+ 알림 규칙, Slack/Email/PagerDuty 통합
+- ✅ **Grafana Dashboards**: 실시간 모니터링 대시보드, Auto-provisioning
 
 ### 안정성
 - ✅ **Circuit Breaker**: 장애 전파 방지
@@ -67,6 +69,7 @@
 │   ├── domain/                           # 도메인 레이어 (DDD)
 │   │   ├── entity/                       # 도메인 엔티티 (Document)
 │   │   ├── repository/                   # 리포지토리 인터페이스
+│   │   ├── tenant/                       # 테넌트 도메인 모델
 │   │   └── valueobject/                  # 값 객체
 │   ├── application/                      # 애플리케이션 레이어
 │   │   ├── usecase/                      # 유즈케이스 (비즈니스 로직)
@@ -77,10 +80,11 @@
 │   │   │   └── vitess/                   # Vitess 구현 (30+ 메서드)
 │   │   ├── cache/                        # Redis 캐시 및 확장 기능
 │   │   ├── messaging/                    # Kafka 메시징
+│   │   ├── tenant/                       # 테넌트 저장소 구현
 │   │   └── monitoring/                   # 모니터링 (메트릭, 추적)
 │   ├── interfaces/                       # 인터페이스 레이어
 │   │   ├── http/                         # HTTP 핸들러 (Gin)
-│   │   │   └── middleware/               # HTTP 미들웨어 (로깅, 추적, 메트릭)
+│   │   │   └── middleware/               # HTTP 미들웨어 (로깅, 추적, 메트릭, 테넌트)
 │   │   └── grpc/                         # gRPC 핸들러
 │   │       └── interceptor/              # gRPC 인터셉터
 │   ├── config/                           # 설정 관리 (Viper)
@@ -93,7 +97,14 @@
 │       └── retry/                        # Retry 로직
 ├── configs/                              # 설정 파일
 │   ├── config.yaml                       # 기본 설정
-│   └── config_local.yaml                 # 로컬 개발 설정
+│   ├── config_local.yaml                 # 로컬 개발 설정
+│   ├── prometheus/                       # Prometheus 설정
+│   │   ├── prometheus.yml                # Prometheus 메인 설정
+│   │   ├── alert_rules.yml               # 알림 규칙 (100+ rules)
+│   │   └── alertmanager.yml              # AlertManager 설정
+│   └── grafana/                          # Grafana 설정
+│       ├── dashboards/                   # 대시보드 JSON
+│       └── provisioning/                 # Auto-provisioning 설정
 ├── deployments/
 │   └── kubernetes/                       # Kubernetes 매니페스트
 │       ├── deployment.yaml               # Deployment (HPA 지원)
@@ -103,11 +114,19 @@
 ├── docs/                                 # 문서
 │   ├── ARCHITECTURE.md                   # 아키텍처 가이드 (Mermaid 다이어그램)
 │   └── VAULT_INTEGRATION.md              # Vault 통합 가이드
+├── test/                                 # 테스트
+│   ├── integration/                      # 통합 테스트 (Testcontainers)
+│   ├── e2e/                              # E2E 테스트 (HTTP API)
+│   ├── benchmark/                        # 벤치마크 테스트
+│   └── load/                             # 부하 테스트 (k6)
+├── scripts/                              # 자동화 스크립트
+│   ├── backup.sh                         # 백업 스크립트
+│   └── restore.sh                        # 복원 스크립트
 ├── proto/                                # gRPC 프로토콜 정의
 ├── Dockerfile.http                       # HTTP 서버 Dockerfile
 ├── Dockerfile.grpc                       # gRPC 서버 Dockerfile
 ├── .gitlab-ci.yml                        # GitLab CI/CD 파이프라인
-└── docker-compose.yml                    # 로컬 개발용 Docker Compose
+└── docker-compose.yml                    # 로컬 개발용 Docker Compose (11 services)
 ```
 
 ## 🛠️ 기술 스택
@@ -142,6 +161,8 @@
 ### 테스팅
 - **Go testing**: 유닛 테스트
 - **Testify**: 테스트 어설션
+- **Testcontainers**: Docker 기반 통합 테스트
+- **k6**: 부하 테스트 및 성능 측정
 
 ## 🚀 시작하기
 
@@ -178,6 +199,9 @@ go mod verify
 ```bash
 # MongoDB, Redis 실행
 docker-compose up -d mongodb redis
+
+# 전체 스택 실행 (11개 서비스: MongoDB, Redis, Kafka, Vault, Prometheus, AlertManager, Grafana 등)
+docker-compose up -d
 
 # 모든 서비스 확인
 docker-compose ps
@@ -245,10 +269,23 @@ kubectl get hpa -n production
 curl http://localhost:8080/health
 ```
 
+#### Multi-tenancy 사용
+모든 API 요청에 테넌트 헤더를 포함해야 합니다:
+
+```bash
+# 테넌트 ID 사용
+-H "X-Tenant-ID: tenant123"
+
+# 또는 API Key 사용 (권장)
+-H "X-API-Key: your-api-key"
+```
+
 #### 문서 생성 (MongoDB)
 ```bash
 curl -X POST http://localhost:8080/api/v1/documents \
   -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: default" \
+  -H "X-API-Key: your-api-key" \
   -d '{
     "collection": "users",
     "data": {
@@ -420,27 +457,63 @@ vault:
 
 ## 🧪 테스트
 
+### 유닛 테스트
 ```bash
-# 유닛 테스트
+# 전체 유닛 테스트
 go test -v ./...
-
-# 통합 테스트 (MongoDB, Redis 필요)
-go test -v -tags=integration ./...
 
 # 커버리지 리포트
 go test -v -coverprofile=coverage.out -covermode=atomic ./...
 go tool cover -func=coverage.out
+go tool cover -html=coverage.out -o coverage.html
+```
 
-# 벤치마크
-go test -bench=. -benchmem ./...
+### 통합 테스트 (Testcontainers)
+```bash
+# Docker가 실행 중이어야 합니다
+go test -v -tags=integration ./test/integration/...
+
+# MongoDB 통합 테스트
+go test -v -tags=integration ./test/integration/ -run TestMongoDBIntegration
+```
+
+### E2E 테스트
+```bash
+# 서비스가 실행 중이어야 합니다 (localhost:8080)
+go test -v -tags=e2e ./test/e2e/...
+```
+
+### 벤치마크 테스트
+```bash
+# 벤치마크 실행
+go test -bench=. -benchmem ./test/benchmark/...
+
+# 특정 벤치마크만 실행
+go test -bench=BenchmarkCreateDocument -benchmem ./test/benchmark/
+```
+
+### 부하 테스트 (k6)
+```bash
+# k6 설치 필요: brew install k6 (macOS) 또는 https://k6.io/docs/get-started/installation/
+
+# 기본 부하 테스트 실행
+cd test/load
+./run-load-test.sh
+
+# 특정 테스트 실행
+k6 run database-service-load-test.js
+
+# 스트레스 테스트
+k6 run scenarios/stress-test.js
 ```
 
 ## 📊 관찰성
 
-### 메트릭 (Prometheus)
+### Prometheus 메트릭
 
-`http://localhost:9091/metrics` 엔드포인트에서 수집:
+Prometheus는 `http://localhost:9090`에서 실행되며, 애플리케이션 메트릭은 `http://localhost:9091/metrics`에서 수집합니다.
 
+#### 수집 메트릭
 - `http_requests_total`: HTTP 요청 총 수
 - `http_request_duration_seconds`: HTTP 요청 지속 시간 (P50, P95, P99)
 - `grpc_requests_total`: gRPC 요청 총 수
@@ -451,6 +524,53 @@ go test -bench=. -benchmem ./...
 - `cache_misses_total`: 캐시 미스 수
 - `kafka_messages_published_total`: Kafka 메시지 발행 수
 - `vault_lease_renewals_total`: Vault Lease 갱신 수
+
+### AlertManager
+
+AlertManager는 `http://localhost:9093`에서 실행됩니다.
+
+#### 알림 규칙 (100+ rules)
+- **서비스 가용성**: 서비스 다운, 높은 에러율 감지
+- **API 성능**: 높은 지연시간, 느린 응답 시간
+- **데이터베이스 건강**: MongoDB/Vitess 연결 실패, 높은 쿼리 지연
+- **캐시 건강**: Redis 연결 실패, 낮은 캐시 히트율
+- **시스템 리소스**: CPU/메모리 사용률, 디스크 공간 부족
+- **비즈니스 메트릭**: 높은 문서 생성 실패율, 비정상적인 트래픽 패턴
+- **보안**: 높은 인증 실패율, 비정상적인 API 요청
+
+#### 알림 채널
+```yaml
+# Slack 알림
+slack_configs:
+  - channel: '#alerts'
+    api_url: 'your-webhook-url'
+
+# Email 알림
+email_configs:
+  - to: 'team@example.com'
+    from: 'alertmanager@example.com'
+
+# PagerDuty 알림 (Critical만)
+pagerduty_configs:
+  - service_key: 'your-service-key'
+```
+
+### Grafana 대시보드
+
+Grafana는 `http://localhost:3000`에서 실행됩니다 (기본 로그인: admin/admin).
+
+#### 자동 프로비저닝된 대시보드
+- **Database Service Overview**: 서비스 상태, CPU/메모리, 요청률, 지연시간, 에러율
+- **실시간 업데이트**: 5초마다 자동 새로고침
+- **시간 범위**: 기본 15분
+
+```bash
+# Grafana UI 접속
+http://localhost:3000
+
+# 대시보드 경로
+Dashboards → Database Service → Database Service Overview
+```
 
 ### 로깅 (Zap)
 
@@ -497,6 +617,120 @@ http://localhost:16686
 - **Network Policies**: Pod 간 통신 제한
 - **Secrets**: 민감 정보 Kubernetes Secrets 저장
 - **TLS/mTLS**: 통신 암호화 (Istio/Linkerd)
+
+## 🏢 Multi-tenancy
+
+Multi-tenancy 기능을 통해 여러 테넌트를 안전하게 격리하고 관리할 수 있습니다.
+
+### 테넌트 Plan
+
+4가지 Plan을 지원합니다:
+
+| Plan | 최대 문서 수 | 최대 저장 공간 | API 호출 (일일) | 컬렉션 수 | Rate Limit |
+|------|-------------|---------------|----------------|-----------|-----------|
+| Free | 1,000 | 100 MB | 10,000 | 3 | 60/분 |
+| Basic | 100,000 | 10 GB | 1,000,000 | 10 | 300/분 |
+| Professional | 10,000,000 | 1 TB | 10,000,000 | 50 | 1,000/분 |
+| Enterprise | 무제한 | 무제한 | 무제한 | 무제한 | 무제한 |
+
+### API Key 인증
+
+```bash
+# API Key 생성 (프로그래밍 방식)
+apiKey := tenant.GenerateAPIKey()
+
+# API 요청 시 사용
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "users", "data": {...}}'
+```
+
+### Quota 관리
+
+각 테넌트는 자동으로 Quota가 체크됩니다:
+
+```go
+// Quota 초과 시 429 Too Many Requests 반환
+{
+  "error": "quota_exceeded",
+  "message": "Daily API call limit exceeded (10000/10000)",
+  "quota": {
+    "limit": 10000,
+    "used": 10000,
+    "reset_at": "2025-11-13T00:00:00Z"
+  }
+}
+```
+
+### 테넌트 격리
+
+- **데이터베이스 격리**: 각 테넌트는 별도의 MongoDB 데이터베이스 사용
+- **API Key 검증**: 모든 요청에 대해 API Key 검증
+- **Usage 추적**: 문서 수, 저장 공간, API 호출 수 실시간 추적
+- **Feature Flag**: Plan별 기능 활성화/비활성화
+
+## 💾 백업 & 복원
+
+### 자동 백업
+
+백업 스크립트는 MongoDB, Redis, 애플리케이션 데이터를 자동으로 백업합니다.
+
+```bash
+# 백업 실행
+./scripts/backup.sh
+
+# 백업 내용
+# - MongoDB 데이터 (mongodump)
+# - Redis 데이터 (dump.rdb)
+# - 애플리케이션 설정 파일 (configs/)
+```
+
+#### 백업 저장 위치
+```
+./backups/
+├── mongodb_20250112_153045.tar.gz
+├── redis_20250112_153045.tar.gz
+├── appdata_20250112_153045.tar.gz
+└── backup_20250112_153045_manifest.txt
+```
+
+#### 자동 보관 정책
+- 백업 보관 기간: 7일
+- 7일 이상 된 백업 자동 삭제
+- Timestamped 파일명으로 버전 관리
+
+### 복원
+
+```bash
+# 사용 가능한 백업 목록 확인
+./scripts/restore.sh
+
+# 특정 백업으로 복원
+./scripts/restore.sh 20250112_153045
+
+# 복원 프로세스
+# 1. 백업 정보 표시
+# 2. 확인 프롬프트 (yes/no)
+# 3. MongoDB 복원 (mongorestore)
+# 4. Redis 복원 (dump.rdb 교체)
+# 5. 애플리케이션 데이터 복원
+```
+
+⚠️ **주의사항**:
+- 복원 시 현재 데이터가 모두 삭제됩니다
+- 프로덕션 환경에서는 반드시 백업 후 복원하세요
+- Redis는 복원 중 재시작됩니다
+
+### Cron 자동 백업 설정
+
+```bash
+# crontab 편집
+crontab -e
+
+# 매일 새벽 3시에 백업 실행
+0 3 * * * /path/to/database-service/scripts/backup.sh >> /var/log/db-backup.log 2>&1
+```
 
 ## 📈 성능 & 확장성
 
@@ -601,19 +835,29 @@ MIT License
 
 ## 🔮 로드맵
 
+### ✅ 완료
 - [x] MongoDB 지원 (30+ 메서드)
 - [x] Vitess 지원 (30+ 메서드)
 - [x] Kafka CDC
 - [x] HashiCorp Vault 통합
 - [x] Redis 확장 기능
 - [x] GitLab CI/CD 파이프라인
+- [x] Multi-tenancy 지원 (API Key, Quota 관리, 4가지 Plan)
+- [x] Prometheus AlertManager (100+ 알림 규칙)
+- [x] Grafana Dashboards (Auto-provisioning)
+- [x] 부하 테스트 (k6 기반)
+- [x] 백업/복원 자동화
+- [x] 통합 테스트 (Testcontainers)
+- [x] E2E 테스트
+- [x] 벤치마크 테스트
+
+### 🔜 향후 계획
 - [ ] PostgreSQL 네이티브 지원
 - [ ] MySQL 네이티브 지원
 - [ ] GraphQL API
 - [ ] Event Sourcing
 - [ ] CQRS 패턴
 - [ ] Service Mesh (Istio) 통합
-- [ ] Multi-tenancy 지원
 - [ ] WebSocket 실시간 알림
 
 ## 📚 참고 문서
