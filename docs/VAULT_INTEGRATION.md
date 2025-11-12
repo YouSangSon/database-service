@@ -52,11 +52,11 @@ graph TB
     APP -->|12. Encrypt Data| TRANSIT_ENGINE
     TRANSIT_ENGINE -->|13. Encrypted| APP
 
-    style APP fill:#90caf9
-    style AUTH fill:#ffb74d
-    style DB_ENGINE fill:#81c784
-    style KV_ENGINE fill:#f06292
-    style TRANSIT_ENGINE fill:#9575cd
+    style APP fill:#90caf9,color:#fff
+    style AUTH fill:#ffb74d,color:#000
+    style DB_ENGINE fill:#81c784,color:#fff
+    style KV_ENGINE fill:#f06292,color:#fff
+    style TRANSIT_ENGINE fill:#9575cd,color:#fff
 ```
 
 **주요 기능:**
@@ -297,10 +297,10 @@ graph LR
     APP -->|Get Secret| S2
     APP -->|Get Secret| S3
 
-    style APP fill:#90caf9
-    style S1 fill:#f06292
-    style S2 fill:#f06292
-    style S3 fill:#f06292
+    style APP fill:#90caf9,color:#fff
+    style S1 fill:#f06292,color:#fff
+    style S2 fill:#f06292,color:#fff
+    style S3 fill:#f06292,color:#fff
 ```
 
 **사용 사례:**
@@ -449,11 +449,11 @@ graph TD
     L -->|No| H
     L -->|Yes| M[Alert & Fail]
 
-    style A fill:#90caf9
-    style C fill:#ffb74d
-    style E fill:#81c784
-    style H fill:#ffd54f
-    style M fill:#ff8a65
+    style A fill:#90caf9,color:#fff
+    style C fill:#ffb74d,color:#000
+    style E fill:#81c784,color:#fff
+    style H fill:#ffd54f,color:#000
+    style M fill:#ff8a65,color:#fff
 ```
 
 **Renewal 설정:**

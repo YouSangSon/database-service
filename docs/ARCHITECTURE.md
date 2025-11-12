@@ -62,14 +62,14 @@ graph TB
     GRPC1 --> KAFKA
     GRPC1 --> VAULT
 
-    style REST fill:#81d4fa
-    style GRPC fill:#81d4fa
-    style LB fill:#ffcc80
-    style MONGO fill:#81c784
-    style VITESS fill:#81c784
-    style REDIS fill:#ff8a65
-    style KAFKA fill:#f06292
-    style VAULT fill:#9575cd
+    style REST fill:#81d4fa,color:#fff
+    style GRPC fill:#81d4fa,color:#fff
+    style LB fill:#ffcc80,color:#000
+    style MONGO fill:#81c784,color:#fff
+    style VITESS fill:#81c784,color:#fff
+    style REDIS fill:#ff8a65,color:#fff
+    style KAFKA fill:#f06292,color:#fff
+    style VAULT fill:#9575cd,color:#fff
 ```
 
 ## 계층 아키텍처 (Clean Architecture + DDD)
@@ -117,14 +117,14 @@ graph TD
     EV --> KAFKA_P
     UC --> VAULT_C
 
-    style HTTP fill:#90caf9
-    style GRPC fill:#90caf9
-    style UC fill:#ffb74d
-    style ENT fill:#ce93d8
-    style REPO_IF fill:#ce93d8
-    style MONGO_R fill:#a5d6a7
-    style VITESS_R fill:#a5d6a7
-    style REDIS_C fill:#f48fb1
+    style HTTP fill:#90caf9,color:#fff
+    style GRPC fill:#90caf9,color:#fff
+    style UC fill:#ffb74d,color:#000
+    style ENT fill:#ce93d8,color:#fff
+    style REPO_IF fill:#ce93d8,color:#fff
+    style MONGO_R fill:#a5d6a7,color:#fff
+    style VITESS_R fill:#a5d6a7,color:#fff
+    style REDIS_C fill:#f48fb1,color:#fff
 ```
 
 ## 주요 컴포넌트
@@ -309,7 +309,7 @@ graph TD
     D --> REDIS
     E --> REDIS
 
-    style REDIS fill:#ff8a65
+    style REDIS fill:#ff8a65,color:#fff
 ```
 
 ### Kafka CDC
@@ -327,13 +327,13 @@ graph LR
         D --> H[Consumer 4<br/>Search Index]
     end
 
-    style A fill:#90caf9
-    style C fill:#f06292
-    style D fill:#f06292
-    style E fill:#81c784
-    style F fill:#81c784
-    style G fill:#81c784
-    style H fill:#81c784
+    style A fill:#90caf9,color:#fff
+    style C fill:#f06292,color:#fff
+    style D fill:#f06292,color:#fff
+    style E fill:#81c784,color:#fff
+    style F fill:#81c784,color:#fff
+    style G fill:#81c784,color:#fff
+    style H fill:#81c784,color:#fff
 ```
 
 ## 보안 (Vault Integration)
@@ -398,7 +398,7 @@ graph TB
     HPA -->|Scale| P3
     HPA -->|Scale| PN
 
-    style HPA fill:#ffb74d
+    style HPA fill:#ffb74d,color:#000
 ```
 
 ## CI/CD 파이프라인
@@ -416,14 +416,14 @@ graph LR
     G -->|Main| I[Deploy to Staging]
     G -->|Tag| J[Deploy to Production]
 
-    style A fill:#90caf9
-    style B fill:#ffb74d
-    style C fill:#ffb74d
-    style E fill:#ce93d8
-    style F fill:#ce93d8
-    style H fill:#81c784
-    style I fill:#ffd54f
-    style J fill:#ff8a65
+    style A fill:#90caf9,color:#fff
+    style B fill:#ffb74d,color:#000
+    style C fill:#ffb74d,color:#000
+    style E fill:#ce93d8,color:#fff
+    style F fill:#ce93d8,color:#fff
+    style H fill:#81c784,color:#fff
+    style I fill:#ffd54f,color:#000
+    style J fill:#ff8a65,color:#fff
 ```
 
 **CI/CD 단계:**
@@ -461,10 +461,10 @@ graph TB
     TRACE --> JAEGER
     METRIC --> GRAFANA
 
-    style APP fill:#90caf9
-    style LOG fill:#ffb74d
-    style TRACE fill:#ce93d8
-    style METRIC fill:#ffd54f
+    style APP fill:#90caf9,color:#fff
+    style LOG fill:#ffb74d,color:#000
+    style TRACE fill:#ce93d8,color:#fff
+    style METRIC fill:#ffd54f,color:#000
 ```
 
 **메트릭:**
