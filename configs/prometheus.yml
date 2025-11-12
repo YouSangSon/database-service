@@ -1,0 +1,71 @@
+# Prometheus Configuration for Database Service
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+# Alert manager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+# rule_files:
+#   - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          environment: 'local'
+
+  # Database Service HTTP API
+  - job_name: 'database-service-http'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api:9091']
+        labels:
+          service: 'database-service'
+          component: 'http-api'
+          environment: 'local'
+
+  # Database Service gRPC
+  - job_name: 'database-service-grpc'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['grpc:9091']
+        labels:
+          service: 'database-service'
+          component: 'grpc-api'
+          environment: 'local'
+
+  # MongoDB Exporter (optional - if installed)
+  # - job_name: 'mongodb'
+  #   static_configs:
+  #     - targets: ['mongodb-exporter:9216']
+  #       labels:
+  #         service: 'mongodb'
+  #         environment: 'local'
+
+  # Redis Exporter (optional - if installed)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #       labels:
+  #         service: 'redis'
+  #         environment: 'local'
+
+  # Kafka Exporter (optional - if installed)
+  # - job_name: 'kafka'
+  #   static_configs:
+  #     - targets: ['kafka-exporter:9308']
+  #       labels:
+  #         service: 'kafka'
+  #         environment: 'local'

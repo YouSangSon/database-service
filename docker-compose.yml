@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  # ============================================
+  # Databases
+  # ============================================
   mongodb:
     image: mongo:7.0
     container_name: database-service-mongodb
@@ -20,56 +23,349 @@ services:
       timeout: 5s
       retries: 5
 
+  # ============================================
+  # Cache & Storage
+  # ============================================
+  redis:
+    image: redis:7.0-alpine
+    container_name: database-service-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass redispassword
+    volumes:
+      - redis_data:/data
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Message Queue
+  # ============================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: database-service-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: database-service-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: database-service-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - database-service-network
+
+  # ============================================
+  # Secrets Management
+  # ============================================
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: database-service-vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "dev-only-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_LOG_LEVEL: "info"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Observability
+  # ============================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: database-service-jaeger
+    ports:
+      - "5775:5775/udp"   # zipkin.thrift compact
+      - "6831:6831/udp"   # jaeger.thrift compact
+      - "6832:6832/udp"   # jaeger.thrift binary
+      - "5778:5778"       # serve configs
+      - "16686:16686"     # UI
+      - "14268:14268"     # Collector HTTP
+      - "14250:14250"     # Collector gRPC
+      - "9411:9411"       # Zipkin
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: ":9411"
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:14269/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: database-service-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: database-service-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - database-service-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Application Services
+  # ============================================
   api:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: api
+      dockerfile: Dockerfile.http
     container_name: database-service-api
     ports:
       - "8080:8080"
+      - "9091:9091"  # Metrics endpoint
     environment:
-      - API_PORT=8080
-      - GRPC_PORT=50051
-      - DB_TYPE=mongodb
-      - DB_HOST=mongodb
-      - DB_PORT=27017
-      - DB_USERNAME=admin
-      - DB_PASSWORD=password
-      - DB_DATABASE=testdb
+      # App Configuration
+      APP_NAME: "database-service"
+      APP_VERSION: "1.0.0-local"
+      APP_ENVIRONMENT: "local"
+      APP_DEBUG: "true"
+      APP_LOG_LEVEL: "debug"
+
+      # Server Configuration
+      APP_SERVER_HTTP_PORT: "8080"
+      APP_SERVER_GRPC_PORT: "9090"
+      APP_SERVER_METRICS_PORT: "9091"
+
+      # MongoDB Configuration
+      APP_MONGODB_ENABLED: "true"
+      APP_MONGODB_URI: "mongodb://admin:password@mongodb:27017"
+      APP_MONGODB_DATABASE: "testdb"
+      APP_MONGODB_USE_VAULT: "false"
+      APP_MONGODB_MAX_POOL_SIZE: "100"
+      APP_MONGODB_MIN_POOL_SIZE: "10"
+
+      # Vitess Configuration
+      APP_VITESS_ENABLED: "false"
+      APP_VITESS_HOST: "localhost"
+      APP_VITESS_PORT: "15306"
+
+      # Redis Configuration
+      APP_REDIS_ENABLED: "true"
+      APP_REDIS_HOST: "redis"
+      APP_REDIS_PORT: "6379"
+      APP_REDIS_PASSWORD: "redispassword"
+      APP_REDIS_DB: "0"
+      APP_REDIS_MAX_RETRIES: "3"
+
+      # Kafka Configuration
+      APP_KAFKA_ENABLED: "true"
+      APP_KAFKA_BROKERS: "kafka:9092"
+      APP_KAFKA_CLIENT_ID: "database-service-api"
+      APP_KAFKA_TOPIC_CREATED: "documents.created"
+      APP_KAFKA_TOPIC_UPDATED: "documents.updated"
+      APP_KAFKA_TOPIC_DELETED: "documents.deleted"
+
+      # Vault Configuration
+      APP_VAULT_ENABLED: "true"
+      APP_VAULT_ADDRESS: "http://vault:8200"
+      APP_VAULT_TOKEN: "dev-only-token"
+      APP_VAULT_AUTH_METHOD: "token"
+
+      # Observability - Tracing
+      APP_OBSERVABILITY_TRACING_ENABLED: "true"
+      APP_OBSERVABILITY_JAEGER_ENDPOINT: "http://jaeger:14268/api/traces"
+
+      # Observability - Metrics
+      APP_OBSERVABILITY_METRICS_ENABLED: "true"
+      APP_OBSERVABILITY_METRICS_NAMESPACE: "database_service"
     depends_on:
       mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     networks:
       - database-service-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   grpc:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: grpc
+      dockerfile: Dockerfile.grpc
     container_name: database-service-grpc
     ports:
-      - "50051:50051"
+      - "9090:9090"
+      - "9092:9091"  # Metrics endpoint
     environment:
-      - API_PORT=8080
-      - GRPC_PORT=50051
-      - DB_TYPE=mongodb
-      - DB_HOST=mongodb
-      - DB_PORT=27017
-      - DB_USERNAME=admin
-      - DB_PASSWORD=password
-      - DB_DATABASE=testdb
+      # App Configuration
+      APP_NAME: "database-service-grpc"
+      APP_VERSION: "1.0.0-local"
+      APP_ENVIRONMENT: "local"
+      APP_DEBUG: "true"
+      APP_LOG_LEVEL: "debug"
+
+      # Server Configuration
+      APP_SERVER_HTTP_PORT: "8080"
+      APP_SERVER_GRPC_PORT: "9090"
+      APP_SERVER_METRICS_PORT: "9091"
+
+      # MongoDB Configuration
+      APP_MONGODB_ENABLED: "true"
+      APP_MONGODB_URI: "mongodb://admin:password@mongodb:27017"
+      APP_MONGODB_DATABASE: "testdb"
+      APP_MONGODB_USE_VAULT: "false"
+      APP_MONGODB_MAX_POOL_SIZE: "100"
+      APP_MONGODB_MIN_POOL_SIZE: "10"
+
+      # Vitess Configuration
+      APP_VITESS_ENABLED: "false"
+
+      # Redis Configuration
+      APP_REDIS_ENABLED: "true"
+      APP_REDIS_HOST: "redis"
+      APP_REDIS_PORT: "6379"
+      APP_REDIS_PASSWORD: "redispassword"
+      APP_REDIS_DB: "0"
+
+      # Kafka Configuration
+      APP_KAFKA_ENABLED: "true"
+      APP_KAFKA_BROKERS: "kafka:9092"
+      APP_KAFKA_CLIENT_ID: "database-service-grpc"
+      APP_KAFKA_TOPIC_CREATED: "documents.created"
+      APP_KAFKA_TOPIC_UPDATED: "documents.updated"
+      APP_KAFKA_TOPIC_DELETED: "documents.deleted"
+
+      # Vault Configuration
+      APP_VAULT_ENABLED: "true"
+      APP_VAULT_ADDRESS: "http://vault:8200"
+      APP_VAULT_TOKEN: "dev-only-token"
+      APP_VAULT_AUTH_METHOD: "token"
+
+      # Observability
+      APP_OBSERVABILITY_TRACING_ENABLED: "true"
+      APP_OBSERVABILITY_JAEGER_ENDPOINT: "http://jaeger:14268/api/traces"
+      APP_OBSERVABILITY_METRICS_ENABLED: "true"
     depends_on:
       mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     networks:
       - database-service-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "grpc-health-probe", "-addr=:9090"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

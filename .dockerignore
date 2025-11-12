@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+README.md
+LICENSE
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test files
+*_test.go
+test/
+coverage.out
+*.test
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.gitlab-ci.yml
+.github/
+
+# Dependencies (will be downloaded during build)
+vendor/
+
+# Configuration (use environment variables or ConfigMaps)
+configs/*.yaml
+configs/*.yml
+!configs/config_local.yaml
+
+# Data and logs
+*.log
+data/
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
