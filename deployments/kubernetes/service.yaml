@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: database-service-api
+  namespace: database-service
+  labels:
+    app: database-service
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: database-service
+    component: api
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database-service-grpc
+  namespace: database-service
+  labels:
+    app: database-service
+    component: grpc
+spec:
+  type: ClusterIP
+  ports:
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: database-service
+    component: grpc
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: database-service
+  namespace: database-service

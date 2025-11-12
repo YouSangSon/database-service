@@ -1,0 +1,201 @@
+# Local Development Configuration
+# This file is for local development and testing
+# All services are configured to run on localhost without requiring Vault or external services
+
+app:
+  name: "database-service"
+  version: "1.0.0-local"
+  environment: "local"
+  debug: true
+
+server:
+  http:
+    host: "0.0.0.0"
+    port: 8080
+    read_timeout: 30s
+    write_timeout: 30s
+    shutdown_timeout: 30s
+    max_request_size: 10485760  # 10MB
+    enable_cors: true
+    allowed_origins:
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+      - "http://127.0.0.1:3000"
+      - "http://127.0.0.1:8080"
+
+  grpc:
+    host: "0.0.0.0"
+    port: 9090
+    max_recv_msg_size: 10485760  # 10MB
+    max_send_msg_size: 10485760  # 10MB
+    connection_timeout: 30s
+    enable_reflection: true  # Enable for development (grpcurl, grpcui)
+
+# MongoDB Configuration (Local)
+mongodb:
+  enabled: true
+  uri: "mongodb://localhost:27017"
+  database: "database_service_local"
+  username: ""
+  password: ""
+  max_pool_size: 50
+  min_pool_size: 5
+  max_connecting: 5
+  connect_timeout: 10s
+  timeout: 30s
+  use_vault: false
+  vault_path: ""
+
+# Vitess Configuration (Disabled by default for local)
+vitess:
+  enabled: false
+  host: "localhost"
+  port: 15306  # VTGate default port
+  keyspace: "commerce"
+  username: "vt_app"
+  password: ""
+  max_open_conns: 50
+  max_idle_conns: 5
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 10m
+  use_vault: false
+  vault_path: ""
+
+# Redis Configuration (Local)
+redis:
+  enabled: true
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 50
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  use_vault: false
+  vault_path: ""
+  enable_pubsub: true
+  pubsub_channels:
+    - "documents.events"
+    - "system.notifications"
+
+# Kafka Configuration (Disabled by default for local)
+kafka:
+  enabled: false
+  brokers:
+    - "localhost:9092"
+  version: "3.6.0"
+  client_id: "database-service-local"
+
+  producer:
+    max_message_bytes: 1048576  # 1MB
+    required_acks: 1  # 0=NoResponse, 1=WaitForLocal, -1=WaitForAll
+    timeout: 10s
+    compression: "snappy"  # none, gzip, snappy, lz4, zstd
+    max_retries: 3
+    retry_backoff: 100ms
+    enable_idempotent: false  # Disable for local
+
+  consumer:
+    group_id: "database-service-local"
+    auto_offset_reset: "earliest"  # earliest, latest
+    enable_auto_commit: true
+    auto_commit_interval: 1s
+    session_timeout: 10s
+    heartbeat_interval: 3s
+    max_processing_time: 1m
+
+  enable_cdc: false  # Disable CDC for local testing
+  cdc_topics:
+    document_created: "local.documents.created"
+    document_updated: "local.documents.updated"
+    document_deleted: "local.documents.deleted"
+
+# Vault Configuration (Disabled for local)
+vault:
+  enabled: false
+  address: "http://localhost:8200"
+  token: "dev-only-token"
+  auth_method: "token"  # token, approle, kubernetes
+  role_id: ""
+  secret_id: ""
+  k8s_role: ""
+  namespace: ""
+
+  tls:
+    enabled: false
+    skip_verify: true  # Only for local development!
+    ca_cert: ""
+    client_cert: ""
+    client_key: ""
+
+  paths:
+    mongodb: "database/creds/mongodb-role"
+    vitess: "database/creds/vitess-role"
+    redis: "secret/data/redis"
+    secrets: "secret/data/app"
+    transit: "transit"
+
+  renewal:
+    interval: 15m
+    renew_before_expiry: 5m
+    max_retries: 3
+    retry_interval: 5s
+
+  cache:
+    enabled: true
+    ttl: 5m
+
+# Observability Configuration (Local)
+observability:
+  logging:
+    level: "debug"  # debug, info, warn, error
+    format: "console"  # json, console (console is more readable for local dev)
+    output: "stdout"  # stdout, stderr, file path
+    development: true
+
+  tracing:
+    enabled: false  # Disable for local unless testing
+    service_name: "database-service-local"
+    jaeger_endpoint: "http://localhost:14268/api/traces"
+    sampling_rate: 1.0  # 100% sampling for local testing
+
+  metrics:
+    enabled: true
+    port: 9091
+    path: "/metrics"
+
+# ==========================================
+# Local Development Tips:
+# ==========================================
+#
+# 1. Starting Required Services:
+#    - MongoDB: docker run -d -p 27017:27017 mongo:7.0
+#    - Redis: docker run -d -p 6379:6379 redis:7-alpine
+#    - Kafka (optional): Use docker-compose for full setup
+#    - Jaeger (optional): docker run -d -p 14268:14268 -p 16686:16686 jaegertracing/all-in-one
+#
+# 2. Running the Application:
+#    - HTTP Server: go run cmd/api/main.go
+#    - gRPC Server: go run cmd/grpc/main.go
+#
+# 3. Testing:
+#    - Unit Tests: go test -v ./...
+#    - Integration Tests: go test -v -tags=integration ./...
+#    - Coverage: go test -v -coverprofile=coverage.out -covermode=atomic ./...
+#
+# 4. Tools:
+#    - HTTP API: curl, httpie, Postman, Insomnia
+#    - gRPC API: grpcurl, grpcui, Bloom RPC
+#    - Metrics: http://localhost:9091/metrics
+#    - Health Check: http://localhost:8080/health
+#
+# 5. Environment Variables:
+#    You can override any configuration with environment variables:
+#    - APP_MONGODB_URI=mongodb://localhost:27017
+#    - APP_REDIS_HOST=localhost
+#    - APP_OBSERVABILITY_LOGGING_LEVEL=debug
+#
+# ==========================================

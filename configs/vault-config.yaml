@@ -1,0 +1,79 @@
+# Vault 설정 예시
+vault:
+  # Vault 서버 주소
+  address: "http://localhost:8200"
+
+  # 인증 방법 (token, approle, kubernetes)
+  auth_method: "token"
+
+  # Token 인증 설정
+  token: "${VAULT_TOKEN}"
+
+  # AppRole 인증 설정 (auth_method가 approle인 경우)
+  # role_id: "${VAULT_ROLE_ID}"
+  # secret_id: "${VAULT_SECRET_ID}"
+
+  # Kubernetes 인증 설정 (auth_method가 kubernetes인 경우)
+  # k8s_role: "database-service"
+  # k8s_service_account: "default"
+
+  # 네임스페이스
+  namespace: ""
+
+  # TLS 설정
+  tls:
+    enabled: false
+    skip_verify: false
+    ca_cert: ""
+    client_cert: ""
+    client_key: ""
+
+  # 시크릿 경로 설정
+  paths:
+    mongodb: "database/creds/mongodb-role"
+    redis: "secret/data/redis"
+    secrets: "secret/data/app"
+    transit: "transit"
+
+  # 자동 갱신 설정
+  renewal:
+    interval: "15m"               # 갱신 체크 간격
+    renew_before_expiry: "5m"     # 만료 전 갱신 시간
+    max_retries: 3                # 최대 재시도 횟수
+    retry_interval: "5s"          # 재시도 간격
+
+  # 캐시 설정
+  cache:
+    enabled: true
+    ttl: "5m"
+
+---
+# 프로덕션 환경 Vault 설정 예시
+vault:
+  address: "https://vault.example.com:8200"
+  auth_method: "kubernetes"
+  k8s_role: "database-service"
+  namespace: "production"
+
+  tls:
+    enabled: true
+    skip_verify: false
+    ca_cert: "/etc/vault/tls/ca.crt"
+    client_cert: "/etc/vault/tls/client.crt"
+    client_key: "/etc/vault/tls/client.key"
+
+  paths:
+    mongodb: "database/creds/production-mongodb"
+    redis: "secret/data/production/redis"
+    secrets: "secret/data/production/app"
+    transit: "transit"
+
+  renewal:
+    interval: "10m"
+    renew_before_expiry: "3m"
+    max_retries: 5
+    retry_interval: "3s"
+
+  cache:
+    enabled: true
+    ttl: "3m"

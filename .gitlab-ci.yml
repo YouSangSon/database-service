@@ -1,0 +1,309 @@
+# GitLab CI/CD Pipeline for Database Service
+# This pipeline builds, tests, and deploys the database service to Kubernetes
+
+variables:
+  # Docker configuration
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_IMAGE_NAME: "${CI_REGISTRY}/${CI_PROJECT_PATH}"
+  DOCKER_TAG: "${CI_COMMIT_SHORT_SHA}"
+
+  # Go configuration
+  GO_VERSION: "1.25"
+  CGO_ENABLED: "0"
+  GOOS: "linux"
+  GOARCH: "amd64"
+
+  # Kubernetes configuration
+  KUBE_NAMESPACE: "production"
+  KUBE_CONTEXT: "production-cluster"
+
+  # Application configuration (from GitLab CI/CD variables)
+  APP_NAME: "database-service"
+  APP_VERSION: "${CI_COMMIT_TAG}"
+
+# Define pipeline stages
+stages:
+  - lint
+  - test
+  - build
+  - docker
+  - deploy
+
+# Cache Go modules for faster builds
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .go/pkg/mod/
+
+# Before script: Setup Go environment
+before_script:
+  - export GOPATH="$CI_PROJECT_DIR/.go"
+  - export PATH="$GOPATH/bin:$PATH"
+  - mkdir -p .go
+
+# ============================================
+# LINT STAGE
+# ============================================
+
+lint:golangci:
+  stage: lint
+  image: golangci/golangci-lint:v1.55
+  script:
+    - golangci-lint run -v --timeout 5m
+  only:
+    - merge_requests
+    - main
+    - develop
+  tags:
+    - docker
+
+# ============================================
+# TEST STAGE
+# ============================================
+
+test:unit:
+  stage: test
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - apk add --no-cache git make
+    - go mod download
+    - go mod verify
+    - |
+      echo "Running unit tests..."
+      go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+    - |
+      echo "Generating coverage report..."
+      go tool cover -func=coverage.out
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.out
+    paths:
+      - coverage.out
+    expire_in: 30 days
+  only:
+    - merge_requests
+    - main
+    - develop
+  tags:
+    - docker
+
+test:integration:
+  stage: test
+  image: golang:${GO_VERSION}
+  services:
+    - name: mongo:7.0
+      alias: mongodb
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    MONGODB_URI: "mongodb://mongodb:27017"
+    REDIS_HOST: "redis"
+    REDIS_PORT: "6379"
+  script:
+    - go mod download
+    - |
+      echo "Running integration tests..."
+      go test -v -tags=integration ./... || true
+  only:
+    - merge_requests
+    - main
+    - develop
+  allow_failure: true
+  tags:
+    - docker
+
+# ============================================
+# BUILD STAGE
+# ============================================
+
+build:binary:
+  stage: build
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - apk add --no-cache git make
+    - go mod download
+    - |
+      echo "Building HTTP server binary..."
+      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo \
+        -ldflags="-w -s -X main.version=${CI_COMMIT_TAG:-dev} -X main.commit=${CI_COMMIT_SHORT_SHA}" \
+        -o bin/http-server ./cmd/api
+    - |
+      echo "Building gRPC server binary..."
+      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo \
+        -ldflags="-w -s -X main.version=${CI_COMMIT_TAG:-dev} -X main.commit=${CI_COMMIT_SHORT_SHA}" \
+        -o bin/grpc-server ./cmd/grpc
+    - ls -lh bin/
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 1 day
+  only:
+    - merge_requests
+    - main
+    - develop
+    - tags
+  tags:
+    - docker
+
+# ============================================
+# DOCKER STAGE
+# ============================================
+
+docker:build-and-push:
+  stage: docker
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  dependencies:
+    - build:binary
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - |
+      # Build Docker images
+      echo "Building Docker images..."
+      docker build -t ${DOCKER_IMAGE_NAME}/http:${DOCKER_TAG} \
+        -t ${DOCKER_IMAGE_NAME}/http:latest \
+        -f Dockerfile.http .
+
+      docker build -t ${DOCKER_IMAGE_NAME}/grpc:${DOCKER_TAG} \
+        -t ${DOCKER_IMAGE_NAME}/grpc:latest \
+        -f Dockerfile.grpc .
+    - |
+      # Push images to registry
+      echo "Pushing images to registry..."
+      docker push ${DOCKER_IMAGE_NAME}/http:${DOCKER_TAG}
+      docker push ${DOCKER_IMAGE_NAME}/http:latest
+      docker push ${DOCKER_IMAGE_NAME}/grpc:${DOCKER_TAG}
+      docker push ${DOCKER_IMAGE_NAME}/grpc:latest
+    - |
+      # Tag and push version tag if exists
+      if [ ! -z "$CI_COMMIT_TAG" ]; then
+        docker tag ${DOCKER_IMAGE_NAME}/http:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}/http:${CI_COMMIT_TAG}
+        docker tag ${DOCKER_IMAGE_NAME}/grpc:${DOCKER_TAG} ${DOCKER_IMAGE_NAME}/grpc:${CI_COMMIT_TAG}
+        docker push ${DOCKER_IMAGE_NAME}/http:${CI_COMMIT_TAG}
+        docker push ${DOCKER_IMAGE_NAME}/grpc:${CI_COMMIT_TAG}
+      fi
+  only:
+    - main
+    - develop
+    - tags
+  tags:
+    - docker
+
+# ============================================
+# DEPLOY STAGE
+# ============================================
+
+deploy:development:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: development
+    url: https://dev.database-service.example.com
+  before_script:
+    - kubectl config use-context ${KUBE_CONTEXT_DEV}
+  script:
+    - |
+      echo "Deploying to development environment..."
+      kubectl set image deployment/database-service-http \
+        http=${DOCKER_IMAGE_NAME}/http:${DOCKER_TAG} \
+        -n development
+
+      kubectl set image deployment/database-service-grpc \
+        grpc=${DOCKER_IMAGE_NAME}/grpc:${DOCKER_TAG} \
+        -n development
+
+      kubectl rollout status deployment/database-service-http -n development
+      kubectl rollout status deployment/database-service-grpc -n development
+  only:
+    - develop
+  tags:
+    - kubernetes
+
+deploy:staging:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: staging
+    url: https://staging.database-service.example.com
+  before_script:
+    - kubectl config use-context ${KUBE_CONTEXT_STAGING}
+  script:
+    - |
+      echo "Deploying to staging environment..."
+      kubectl set image deployment/database-service-http \
+        http=${DOCKER_IMAGE_NAME}/http:${DOCKER_TAG} \
+        -n staging
+
+      kubectl set image deployment/database-service-grpc \
+        grpc=${DOCKER_IMAGE_NAME}/grpc:${DOCKER_TAG} \
+        -n staging
+
+      kubectl rollout status deployment/database-service-http -n staging
+      kubectl rollout status deployment/database-service-grpc -n staging
+  when: manual
+  only:
+    - main
+  tags:
+    - kubernetes
+
+deploy:production:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://database-service.example.com
+  before_script:
+    - kubectl config use-context ${KUBE_CONTEXT}
+  script:
+    - |
+      echo "Deploying to production environment..."
+
+      # Apply Kubernetes manifests with environment variables
+      envsubst < deployments/kubernetes/deployment.yaml | kubectl apply -f -
+      envsubst < deployments/kubernetes/service.yaml | kubectl apply -f -
+      envsubst < deployments/kubernetes/ingress.yaml | kubectl apply -f -
+      envsubst < deployments/kubernetes/hpa.yaml | kubectl apply -f -
+
+      # Update image tags
+      kubectl set image deployment/database-service-http \
+        http=${DOCKER_IMAGE_NAME}/http:${DOCKER_TAG} \
+        -n ${KUBE_NAMESPACE}
+
+      kubectl set image deployment/database-service-grpc \
+        grpc=${DOCKER_IMAGE_NAME}/grpc:${DOCKER_TAG} \
+        -n ${KUBE_NAMESPACE}
+
+      # Wait for rollout to complete
+      kubectl rollout status deployment/database-service-http -n ${KUBE_NAMESPACE} --timeout=5m
+      kubectl rollout status deployment/database-service-grpc -n ${KUBE_NAMESPACE} --timeout=5m
+
+      echo "Deployment completed successfully!"
+  when: manual
+  only:
+    - main
+    - tags
+  tags:
+    - kubernetes
+
+# ============================================
+# CLEANUP STAGE (Optional)
+# ============================================
+
+cleanup:old-images:
+  stage: .post
+  image: docker:24
+  script:
+    - |
+      echo "Cleaning up old Docker images..."
+      docker image prune -af --filter "until=168h"
+  when: always
+  only:
+    - main
+  tags:
+    - docker

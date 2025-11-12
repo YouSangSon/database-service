@@ -1,0 +1,163 @@
+# 프로덕션 환경 설정
+
+app:
+  name: "database-service"
+  version: "1.0.0"
+  environment: "production"
+  debug: false
+
+server:
+  http:
+    host: "0.0.0.0"
+    port: 8080
+    read_timeout: 60s
+    write_timeout: 60s
+    shutdown_timeout: 60s
+    max_request_size: 10485760
+    enable_cors: true
+    allowed_origins:
+      - "https://yourdomain.com"
+
+  grpc:
+    host: "0.0.0.0"
+    port: 9090
+    max_recv_msg_size: 10485760
+    max_send_msg_size: 10485760
+    connection_timeout: 30s
+    enable_reflection: false
+
+# MongoDB 설정 (Vault 사용)
+mongodb:
+  enabled: true
+  uri: ""  # Vault에서 가져옴
+  database: "database_service"
+  max_pool_size: 100
+  min_pool_size: 10
+  max_connecting: 10
+  connect_timeout: 10s
+  timeout: 30s
+  use_vault: true
+  vault_path: "database/creds/production-mongodb"
+
+# Vitess 설정 (Vault 사용)
+vitess:
+  enabled: true
+  host: "vtgate.production.svc.cluster.local"
+  port: 15306
+  keyspace: "commerce"
+  username: ""  # Vault에서 가져옴
+  password: ""  # Vault에서 가져옴
+  max_open_conns: 200
+  max_idle_conns: 20
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 10m
+  use_vault: true
+  vault_path: "database/creds/production-vitess"
+
+# Redis 설정 (Vault 사용)
+redis:
+  enabled: true
+  host: "redis.production.svc.cluster.local"
+  port: 6379
+  password: ""  # Vault에서 가져옴
+  db: 0
+  max_retries: 3
+  pool_size: 200
+  min_idle_conns: 20
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  use_vault: true
+  vault_path: "secret/data/production/redis"
+  enable_pubsub: true
+  pubsub_channels:
+    - "documents.events"
+    - "system.notifications"
+
+# Kafka 설정
+kafka:
+  enabled: true
+  brokers:
+    - "kafka-0.kafka-headless.kafka.svc.cluster.local:9092"
+    - "kafka-1.kafka-headless.kafka.svc.cluster.local:9092"
+    - "kafka-2.kafka-headless.kafka.svc.cluster.local:9092"
+  version: "3.6.0"
+  client_id: "database-service"
+
+  producer:
+    max_message_bytes: 1048576
+    required_acks: -1  # Wait for all in-sync replicas
+    timeout: 30s
+    compression: "snappy"
+    max_retries: 5
+    retry_backoff: 200ms
+    enable_idempotent: true
+
+  consumer:
+    group_id: "database-service-production"
+    auto_offset_reset: "earliest"
+    enable_auto_commit: true
+    auto_commit_interval: 5s
+    session_timeout: 30s
+    heartbeat_interval: 10s
+    max_processing_time: 5m
+
+  enable_cdc: true
+  cdc_topics:
+    document_created: "production.documents.created"
+    document_updated: "production.documents.updated"
+    document_deleted: "production.documents.deleted"
+
+# Vault 설정 (Kubernetes 인증)
+vault:
+  enabled: true
+  address: "https://vault.production.svc.cluster.local:8200"
+  token: ""
+  auth_method: "kubernetes"
+  role_id: ""
+  secret_id: ""
+  k8s_role: "database-service"
+  namespace: "production"
+
+  tls:
+    enabled: true
+    skip_verify: false
+    ca_cert: "/etc/vault/tls/ca.crt"
+    client_cert: "/etc/vault/tls/client.crt"
+    client_key: "/etc/vault/tls/client.key"
+
+  paths:
+    mongodb: "database/creds/production-mongodb"
+    vitess: "database/creds/production-vitess"
+    redis: "secret/data/production/redis"
+    secrets: "secret/data/production/app"
+    transit: "transit"
+
+  renewal:
+    interval: 10m
+    renew_before_expiry: 3m
+    max_retries: 5
+    retry_interval: 3s
+
+  cache:
+    enabled: true
+    ttl: 3m
+
+# Observability 설정
+observability:
+  logging:
+    level: "info"
+    format: "json"
+    output: "stdout"
+    development: false
+
+  tracing:
+    enabled: true
+    service_name: "database-service"
+    jaeger_endpoint: "http://jaeger-collector.observability.svc.cluster.local:14268/api/traces"
+    sampling_rate: 0.1  # 10% sampling
+
+  metrics:
+    enabled: true
+    port: 9091
+    path: "/metrics"
