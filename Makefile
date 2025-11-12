@@ -1,4 +1,11 @@
-.PHONY: proto build run-api run-grpc docker-build docker-up docker-down test clean
+.PHONY: proto swagger build run-api run-grpc docker-build docker-up docker-down test clean
+
+# Swagger 문서 생성
+swagger:
+	@echo "Generating Swagger documentation..."
+	swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
+	@echo "Swagger docs generated at docs/ directory"
+	@echo "Access Swagger UI at http://localhost:8080/swagger/index.html"
 
 # Proto 파일 컴파일
 proto:
