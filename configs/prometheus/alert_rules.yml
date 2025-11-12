@@ -1,0 +1,322 @@
+groups:
+  # ==============================================================================
+  # 서비스 가용성 알림
+  # ==============================================================================
+  - name: service_availability
+    interval: 30s
+    rules:
+      # API 서버 다운
+      - alert: APIServerDown
+        expr: up{job="database-service-http"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "API Server is down"
+          description: "API Server ({{ $labels.instance }}) has been down for more than 1 minute."
+          runbook: "https://docs.example.com/runbooks/api-server-down"
+
+      # gRPC 서버 다운
+      - alert: GRPCServerDown
+        expr: up{job="database-service-grpc"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: grpc
+        annotations:
+          summary: "gRPC Server is down"
+          description: "gRPC Server ({{ $labels.instance }}) has been down for more than 1 minute."
+
+      # 서비스 재시작 빈번
+      - alert: ServiceRestartingFrequently
+        expr: rate(process_start_time_seconds[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Service restarting frequently"
+          description: "Service ({{ $labels.instance }}) is restarting frequently ({{ $value }} times in 5 minutes)."
+
+  # ==============================================================================
+  # HTTP/gRPC 성능 알림
+  # ==============================================================================
+  - name: api_performance
+    interval: 1m
+    rules:
+      # HTTP 응답 시간 지연
+      - alert: HighHTTPLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          type: performance
+        annotations:
+          summary: "High HTTP request latency"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.method }} {{ $labels.path }}"
+
+      # HTTP 에러율 높음
+      - alert: HighHTTPErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          type: performance
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "Error rate is {{ $value }} req/s for {{ $labels.method }} {{ $labels.path }}"
+
+      # gRPC 응답 시간 지연
+      - alert: HighGRPCLatency
+        expr: histogram_quantile(0.95, rate(grpc_server_handling_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          type: performance
+        annotations:
+          summary: "High gRPC request latency"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.grpc_method }}"
+
+      # gRPC 에러율 높음
+      - alert: HighGRPCErrorRate
+        expr: rate(grpc_server_handled_total{grpc_code!="OK"}[5m]) / rate(grpc_server_handled_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          type: performance
+        annotations:
+          summary: "High gRPC error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.grpc_method }}"
+
+  # ==============================================================================
+  # 데이터베이스 알림
+  # ==============================================================================
+  - name: database_health
+    interval: 1m
+    rules:
+      # MongoDB 연결 실패
+      - alert: MongoDBDown
+        expr: mongodb_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "MongoDB is down"
+          description: "MongoDB instance ({{ $labels.instance }}) is down for more than 1 minute."
+
+      # MongoDB 연결 수 높음
+      - alert: MongoDBHighConnections
+        expr: mongodb_connections{state="current"} > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "MongoDB has high number of connections"
+          description: "MongoDB has {{ $value }} connections (threshold: 1000)"
+
+      # 느린 쿼리
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(db_operation_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+          type: performance
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s for {{ $labels.operation }}"
+
+      # 데이터베이스 쓰기 지연
+      - alert: DatabaseWriteLatency
+        expr: rate(db_operation_duration_seconds_sum{operation="save"}[5m]) / rate(db_operation_duration_seconds_count{operation="save"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database write latency"
+          description: "Average write latency is {{ $value }}s"
+
+  # ==============================================================================
+  # Redis 캐시 알림
+  # ==============================================================================
+  - name: cache_health
+    interval: 1m
+    rules:
+      # Redis 연결 실패
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance ({{ $labels.instance }}) is down."
+
+      # 캐시 히트율 낮음
+      - alert: LowCacheHitRate
+        expr: rate(cache_hits_total[5m]) / (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) < 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+      # Redis 메모리 사용률 높음
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis is using {{ $value | humanizePercentage }} of available memory"
+
+  # ==============================================================================
+  # Kafka 알림
+  # ==============================================================================
+  - name: kafka_health
+    interval: 1m
+    rules:
+      # Kafka 프로듀서 에러
+      - alert: KafkaProducerErrors
+        expr: rate(kafka_producer_errors_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Kafka producer errors detected"
+          description: "Kafka producer error rate is {{ $value }} errors/s"
+
+      # Kafka 메시지 지연
+      - alert: KafkaHighLatency
+        expr: kafka_producer_latency_seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+          type: performance
+        annotations:
+          summary: "High Kafka producer latency"
+          description: "Kafka producer latency is {{ $value }}s"
+
+  # ==============================================================================
+  # 시스템 리소스 알림
+  # ==============================================================================
+  - name: system_resources
+    interval: 1m
+    rules:
+      # CPU 사용률 높음
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(process_cpu_seconds_total[5m])) * 100) < 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for {{ $labels.instance }}"
+
+      # 메모리 사용률 높음
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / node_memory_MemTotal_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      # 디스크 사용률 높음
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is above 90% for {{ $labels.instance }} ({{ $labels.mountpoint }})"
+
+      # 파일 디스크립터 사용률 높음
+      - alert: HighFileDescriptorUsage
+        expr: (process_open_fds / process_max_fds) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High file descriptor usage"
+          description: "File descriptor usage is {{ $value | humanizePercentage }}"
+
+  # ==============================================================================
+  # 비즈니스 메트릭 알림
+  # ==============================================================================
+  - name: business_metrics
+    interval: 5m
+    rules:
+      # 테넌트 할당량 초과 임박
+      - alert: TenantQuotaNearLimit
+        expr: (tenant_documents_count / tenant_quota_max_documents) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          type: business
+        annotations:
+          summary: "Tenant quota near limit"
+          description: "Tenant {{ $labels.tenant_id }} is using {{ $value | humanizePercentage }} of document quota"
+
+      # 비정상적인 API 호출 급증
+      - alert: UnusualAPITrafficSpike
+        expr: rate(http_requests_total[1m]) > (avg_over_time(rate(http_requests_total[1m])[1h:1m]) * 3)
+        for: 5m
+        labels:
+          severity: warning
+          type: security
+        annotations:
+          summary: "Unusual API traffic spike detected"
+          description: "API traffic is {{ $value }}x higher than usual"
+
+      # Rate limit 초과 빈번
+      - alert: FrequentRateLimitExceeded
+        expr: rate(rate_limit_exceeded_total[5m]) > 1
+        for: 10m
+        labels:
+          severity: warning
+          type: security
+        annotations:
+          summary: "Frequent rate limit violations"
+          description: "Rate limit is being exceeded {{ $value }} times per second"
+
+  # ==============================================================================
+  # 보안 알림
+  # ==============================================================================
+  - name: security_alerts
+    interval: 1m
+    rules:
+      # 인증 실패 빈번
+      - alert: HighAuthenticationFailureRate
+        expr: rate(authentication_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          type: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }} failures/s"
+
+      # 비정상적인 에러율
+      - alert: AbnormalErrorRate
+        expr: rate(http_requests_total{status=~"4.."}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          type: security
+        annotations:
+          summary: "Abnormal 4xx error rate"
+          description: "4xx error rate is {{ $value }} req/s, possible attack or misconfiguration"

@@ -1,0 +1,143 @@
+global:
+  # 알림 재전송 간격
+  resolve_timeout: 5m
+
+  # Slack 웹훅 URL (환경 변수로 설정 권장)
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+# 알림 라우팅 규칙
+route:
+  # 기본 수신자
+  receiver: 'team-alerts'
+
+  # 그룹화 기준
+  group_by: ['alertname', 'cluster', 'service']
+
+  # 첫 알림 전송 대기 시간
+  group_wait: 10s
+
+  # 추가 알림 전송 간격
+  group_interval: 10s
+
+  # 동일 알림 재전송 간격
+  repeat_interval: 12h
+
+  # 하위 라우팅 규칙
+  routes:
+    # 중요 알림 - 즉시 전송
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+
+    # 데이터베이스 관련 알림
+    - match:
+        service: database
+      receiver: 'database-team'
+      group_interval: 5m
+
+    # 성능 관련 알림
+    - match:
+        type: performance
+      receiver: 'performance-team'
+      group_interval: 15m
+
+    # 보안 관련 알림
+    - match:
+        type: security
+      receiver: 'security-team'
+      group_wait: 0s
+      repeat_interval: 1h
+
+# 알림 수신자 설정
+receivers:
+  # 기본 팀 알림
+  - name: 'team-alerts'
+    slack_configs:
+      - channel: '#alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+
+  # 중요 알림
+  - name: 'critical-alerts'
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Graph:* <{{ .ExternalURL }}|:chart_with_upwards_trend: View in Prometheus>
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+    # PagerDuty 통합 (선택사항)
+    # pagerduty_configs:
+    #   - service_key: '${PAGERDUTY_SERVICE_KEY}'
+    #     description: '{{ .CommonAnnotations.summary }}'
+
+    # Email 알림 (선택사항)
+    email_configs:
+      - to: 'oncall@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        headers:
+          Subject: '🚨 CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+
+  # 데이터베이스 팀 알림
+  - name: 'database-team'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: '💾 Database Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.description }}'
+        send_resolved: true
+
+  # 성능 팀 알림
+  - name: 'performance-team'
+    slack_configs:
+      - channel: '#performance-alerts'
+        title: '⚡ Performance Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.description }}'
+        send_resolved: true
+
+  # 보안 팀 알림
+  - name: 'security-team'
+    slack_configs:
+      - channel: '#security-alerts'
+        title: '🔒 Security Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.description }}'
+        send_resolved: true
+        color: 'warning'
+
+# 알림 억제 규칙 (Inhibition Rules)
+inhibit_rules:
+  # 중요 알림이 발생하면 경고 알림 억제
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
+
+  # 서비스 다운 시 성능 알림 억제
+  - source_match:
+      alertname: 'ServiceDown'
+    target_match:
+      type: 'performance'
+    equal: ['service']
+
+  # 데이터베이스 연결 실패 시 쿼리 성능 알림 억제
+  - source_match:
+      alertname: 'MongoDBDown'
+    target_match:
+      alertname: 'SlowQuery'
+    equal: ['instance']
+
+# 템플릿 파일 경로
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
