@@ -266,9 +266,14 @@ func LoadConfig(configPath string, configName string) (*Config, error) {
 }
 
 // overrideFromEnv는 환경변수로 민감한 설정을 오버라이드합니다
+// GitLab CI/CD 프로젝트 변수를 지원합니다
 func overrideFromEnv(config *Config) {
+	// Vault 설정
 	if val := viper.GetString("VAULT_TOKEN"); val != "" {
 		config.Vault.Token = val
+	}
+	if val := viper.GetString("VAULT_ADDRESS"); val != "" {
+		config.Vault.Address = val
 	}
 	if val := viper.GetString("VAULT_ROLE_ID"); val != "" {
 		config.Vault.RoleID = val
@@ -276,14 +281,77 @@ func overrideFromEnv(config *Config) {
 	if val := viper.GetString("VAULT_SECRET_ID"); val != "" {
 		config.Vault.SecretID = val
 	}
+	if val := viper.GetString("VAULT_NAMESPACE"); val != "" {
+		config.Vault.Namespace = val
+	}
+
+	// MongoDB 설정
 	if val := viper.GetString("MONGODB_URI"); val != "" {
 		config.MongoDB.URI = val
+	}
+	if val := viper.GetString("MONGODB_DATABASE"); val != "" {
+		config.MongoDB.Database = val
+	}
+	if val := viper.GetString("MONGODB_USERNAME"); val != "" {
+		config.MongoDB.Username = val
+	}
+	if val := viper.GetString("MONGODB_PASSWORD"); val != "" {
+		config.MongoDB.Password = val
+	}
+
+	// Vitess 설정
+	if val := viper.GetString("VITESS_HOST"); val != "" {
+		config.Vitess.Host = val
+	}
+	if val := viper.GetString("VITESS_USERNAME"); val != "" {
+		config.Vitess.Username = val
+	}
+	if val := viper.GetString("VITESS_PASSWORD"); val != "" {
+		config.Vitess.Password = val
+	}
+	if val := viper.GetString("VITESS_KEYSPACE"); val != "" {
+		config.Vitess.Keyspace = val
+	}
+
+	// Redis 설정
+	if val := viper.GetString("REDIS_HOST"); val != "" {
+		config.Redis.Host = val
 	}
 	if val := viper.GetString("REDIS_PASSWORD"); val != "" {
 		config.Redis.Password = val
 	}
-	if val := viper.GetString("VITESS_PASSWORD"); val != "" {
-		config.Vitess.Password = val
+
+	// Kafka 설정
+	if val := viper.GetString("KAFKA_BROKERS"); val != "" {
+		brokers := strings.Split(val, ",")
+		config.Kafka.Brokers = brokers
+	}
+	if val := viper.GetString("KAFKA_CLIENT_ID"); val != "" {
+		config.Kafka.ClientID = val
+	}
+
+	// 애플리케이션 설정 (GitLab CI/CD 변수)
+	if val := viper.GetString("APP_ENVIRONMENT"); val != "" {
+		config.App.Environment = val
+	}
+	if val := viper.GetString("APP_VERSION"); val != "" {
+		config.App.Version = val
+	}
+	if val := viper.GetString("CI_COMMIT_TAG"); val != "" {
+		// GitLab CI/CD 태그가 있으면 버전으로 사용
+		config.App.Version = val
+	}
+	if val := viper.GetString("CI_ENVIRONMENT_NAME"); val != "" {
+		// GitLab CI/CD 환경 이름 사용
+		config.App.Environment = val
+	}
+
+	// Observability 설정
+	if val := viper.GetString("JAEGER_ENDPOINT"); val != "" {
+		config.Observability.Tracing.JaegerEndpoint = val
+	}
+	if val := viper.GetString("LOG_LEVEL"); val != "" {
+		config.Observability.Logging.Level = val
 	}
 }
 

@@ -4,442 +4,480 @@
 
 ## 시스템 구성도
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Applications                       │
-│                    (REST, gRPC, WebSocket)                       │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────────┐
-│                      Load Balancer                               │
-│                    (Kubernetes Ingress)                          │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │
-┌───────────────────────▼─────────────────────────────────────────┐
-│                  Database Service (Multiple Pods)                │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  HTTP Server (Port 8080)  │  gRPC Server (Port 9090)     │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │              Middleware / Interceptors                    │  │
-│  │  - Logging   - Tracing   - Metrics   - Recovery          │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │                   Use Case Layer                          │  │
-│  │  - Document CRUD   - Event Publishing   - Caching        │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │                 Domain Layer (DDD)                        │  │
-│  │  - Entities   - Value Objects   - Domain Services        │  │
-│  ├──────────────────────────────────────────────────────────┤  │
-│  │               Infrastructure Layer                        │  │
-│  │  - MongoDB Repo   - Vitess Repo   - Redis Cache          │  │
-│  │  - Kafka Producer   - Vault Client                       │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└───────────────────────┬─────────────────────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┬───────────────┬─────────────┐
-        │               │               │               │             │
-┌───────▼──────┐ ┌──────▼──────┐ ┌─────▼─────┐ ┌──────▼─────┐ ┌────▼────┐
-│   MongoDB    │ │   Vitess    │ │   Redis   │ │   Kafka    │ │  Vault  │
-│   Cluster    │ │   Cluster   │ │  Cluster  │ │  Cluster   │ │ Server  │
-└──────────────┘ └─────────────┘ └───────────┘ └────────────┘ └─────────┘
+```mermaid
+graph TB
+    subgraph "Client Applications"
+        REST[REST Clients]
+        GRPC[gRPC Clients]
+        WS[WebSocket Clients]
+    end
+
+    subgraph "Load Balancer"
+        LB[Kubernetes Ingress<br/>Load Balancer]
+    end
+
+    subgraph "Database Service Pods"
+        subgraph "Pod 1"
+            HTTP1[HTTP Server<br/>Port 8080]
+            GRPC1[gRPC Server<br/>Port 9090]
+        end
+        subgraph "Pod 2"
+            HTTP2[HTTP Server<br/>Port 8080]
+            GRPC2[gRPC Server<br/>Port 9090]
+        end
+        subgraph "Pod N"
+            HTTPN[HTTP Server<br/>Port 8080]
+            GRPCN[gRPC Server<br/>Port 9090]
+        end
+    end
+
+    subgraph "Data Layer"
+        MONGO[(MongoDB<br/>Cluster)]
+        VITESS[(Vitess<br/>Cluster)]
+        REDIS[(Redis<br/>Cluster)]
+        KAFKA[Kafka<br/>Cluster]
+        VAULT[Vault<br/>Server]
+    end
+
+    REST --> LB
+    GRPC --> LB
+    WS --> LB
+
+    LB --> HTTP1
+    LB --> HTTP2
+    LB --> HTTPN
+    LB --> GRPC1
+    LB --> GRPC2
+    LB --> GRPCN
+
+    HTTP1 --> MONGO
+    HTTP1 --> VITESS
+    HTTP1 --> REDIS
+    HTTP1 --> KAFKA
+    HTTP1 --> VAULT
+
+    GRPC1 --> MONGO
+    GRPC1 --> VITESS
+    GRPC1 --> REDIS
+    GRPC1 --> KAFKA
+    GRPC1 --> VAULT
+
+    style REST fill:#e1f5ff
+    style GRPC fill:#e1f5ff
+    style LB fill:#fff4e6
+    style MONGO fill:#c8e6c9
+    style VITESS fill:#c8e6c9
+    style REDIS fill:#ffccbc
+    style KAFKA fill:#f8bbd0
+    style VAULT fill:#d1c4e9
 ```
 
-## 폴더 구조
+## 계층 아키텍처 (Clean Architecture + DDD)
 
-```
-database-service/
-├── cmd/                           # 애플리케이션 엔트리포인트
-│   ├── api/                      # HTTP 서버
-│   └── grpc/                     # gRPC 서버
-├── configs/                       # 설정 파일
-│   ├── config.yaml               # 개발 환경 설정
-│   ├── config.production.yaml    # 프로덕션 환경 설정
-│   ├── vault-config.yaml         # Vault 설정
-│   └── vault-setup.sh            # Vault 초기 설정 스크립트
-├── internal/                      # 내부 패키지
-│   ├── config/                   # 설정 로더 (Viper)
-│   │   └── config.go
-│   ├── domain/                   # 도메인 레이어 (DDD)
-│   │   ├── entity/              # 엔티티
-│   │   │   └── document.go
-│   │   └── repository/          # 레포지토리 인터페이스
-│   │       └── document_repository.go
-│   ├── application/              # 애플리케이션 레이어
-│   │   └── usecase/             # 유스케이스
-│   │       └── document_usecase.go
-│   ├── infrastructure/           # 인프라스트럭처 레이어
-│   │   ├── persistence/         # 영속성
-│   │   │   ├── mongodb/        # MongoDB 구현
-│   │   │   │   ├── document_repository.go
-│   │   │   │   ├── aggregation_operations.go
-│   │   │   │   ├── atomic_operations.go
-│   │   │   │   ├── bulk_operations.go
-│   │   │   │   ├── index_operations.go
-│   │   │   │   ├── collection_operations.go
-│   │   │   │   ├── query_operations.go
-│   │   │   │   └── change_streams.go
-│   │   │   └── vitess/         # Vitess 구현
-│   │   │       └── vitess_repository.go
-│   │   ├── cache/              # 캐싱
-│   │   │   ├── redis.go
-│   │   │   └── redis_extended.go  # Pub/Sub, Rate Limiting, Lock
-│   │   └── messaging/          # 메시징
-│   │       └── kafka/
-│   │           └── producer.go     # CDC, Event Sourcing
-│   ├── interfaces/               # 인터페이스 레이어
-│   │   ├── http/                # HTTP 핸들러
-│   │   │   ├── handler/
-│   │   │   └── middleware/     # HTTP 미들웨어
-│   │   └── grpc/                # gRPC 핸들러
-│   │       ├── handler/
-│   │       └── interceptor/    # gRPC 인터셉터
-│   └── pkg/                      # 공통 패키지
-│       ├── logger/              # 구조화된 로깅 (Zap)
-│       ├── metrics/             # 메트릭 (Prometheus)
-│       ├── tracing/             # 분산 추적 (OpenTelemetry)
-│       ├── errors/              # 에러 처리
-│       └── vault/               # Vault 클라이언트
-│           ├── client.go       # 클라이언트 및 인증
-│           ├── config.go       # 설정
-│           ├── secrets.go      # 시크릿 관리
-│           ├── encryption.go   # Transit Engine
-│           └── database.go     # DB 자격증명 관리
-├── examples/                     # 예시 코드
-│   ├── vault_example.go
-│   └── complete_example.go
-├── docs/                         # 문서
-│   ├── ARCHITECTURE.md
-│   └── VAULT_INTEGRATION.md
-├── deployments/                  # 배포 관련
-│   └── kubernetes/              # Kubernetes 매니페스트
-└── go.mod                        # Go 모듈
+```mermaid
+graph TD
+    subgraph "Interface Layer"
+        HTTP[HTTP Handlers]
+        GRPC[gRPC Handlers]
+        MW[Middleware/<br/>Interceptors]
+    end
 
+    subgraph "Application Layer"
+        UC[Use Cases]
+        EV[Event Publishers]
+        CACHE[Caching Logic]
+    end
+
+    subgraph "Domain Layer"
+        ENT[Entities]
+        VO[Value Objects]
+        REPO_IF[Repository<br/>Interfaces]
+        DS[Domain Services]
+    end
+
+    subgraph "Infrastructure Layer"
+        MONGO_R[MongoDB<br/>Repository]
+        VITESS_R[Vitess<br/>Repository]
+        REDIS_C[Redis<br/>Cache]
+        KAFKA_P[Kafka<br/>Producer]
+        VAULT_C[Vault<br/>Client]
+    end
+
+    HTTP --> MW
+    GRPC --> MW
+    MW --> UC
+    UC --> EV
+    UC --> CACHE
+    UC --> ENT
+    UC --> REPO_IF
+    REPO_IF --> MONGO_R
+    REPO_IF --> VITESS_R
+    ENT --> DS
+    CACHE --> REDIS_C
+    EV --> KAFKA_P
+    UC --> VAULT_C
+
+    style HTTP fill:#e3f2fd
+    style GRPC fill:#e3f2fd
+    style UC fill:#fff3e0
+    style ENT fill:#f3e5f5
+    style REPO_IF fill:#f3e5f5
+    style MONGO_R fill:#e8f5e9
+    style VITESS_R fill:#e8f5e9
+    style REDIS_C fill:#fce4ec
 ```
 
 ## 주요 컴포넌트
 
 ### 1. Domain Layer (DDD)
 
-**엔티티:**
-- `Document`: 범용 문서 엔티티
-- 버전 관리 (낙관적 잠금)
-- 불변성 보장
+```mermaid
+classDiagram
+    class Document {
+        -id string
+        -collection string
+        -data map
+        -version int
+        -createdAt time
+        -updatedAt time
+        +ID() string
+        +Collection() string
+        +Data() map
+        +Version() int
+        +IncrementVersion()
+        +Validate() error
+    }
 
-**레포지토리 인터페이스:**
-- 데이터베이스 독립적 인터페이스
-- MongoDB, Vitess 모두 동일한 인터페이스 구현
-- 30+ 메서드 지원
+    class DocumentRepository {
+        <<interface>>
+        +Save(doc)
+        +SaveMany(docs)
+        +FindByID(id)
+        +FindAll(filter)
+        +FindWithOptions(filter, opts)
+        +Update(doc)
+        +UpdateMany(filter, update)
+        +Delete(id)
+        +DeleteMany(filter)
+        +FindAndUpdate(id, update)
+        +FindOneAndReplace(id, replacement)
+        +FindOneAndDelete(id)
+        +Upsert(filter, update)
+        +Aggregate(pipeline)
+        +Distinct(field, filter)
+        +Count(filter)
+        +BulkWrite(operations)
+        +CreateIndex(model)
+        +WithTransaction(fn)
+    }
 
-### 2. Application Layer
+    class MongoDBRepository {
+        -client *mongo.Client
+        -database *mongo.Database
+        +Save(doc)
+        +FindByID(id)
+        +Aggregate(pipeline)
+        +...30+ methods
+    }
 
-**유스케이스:**
-- 비즈니스 로직 처리
-- 트랜잭션 관리
-- 이벤트 발행
-- 캐싱 전략
+    class VitessRepository {
+        -db *sql.DB
+        -keyspace string
+        +Save(doc)
+        +FindByID(id)
+        +Aggregate(pipeline)
+        +...30+ methods
+    }
 
-### 3. Infrastructure Layer
+    DocumentRepository <|.. MongoDBRepository
+    DocumentRepository <|.. VitessRepository
+    Document --> DocumentRepository
+```
 
-**MongoDB:**
-- 기본 CRUD
-- 집계 (Aggregate, Distinct)
-- 벌크 작업
-- 인덱스 관리
-- Change Streams
-- 트랜잭션
+### 2. 문서 생성 흐름
 
-**Vitess:**
-- MySQL 프로토콜 사용
-- 수평 확장
-- 샤딩 지원
-- 트랜잭션
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Middleware
+    participant Handler
+    participant UseCase
+    participant Repository
+    participant MongoDB
+    participant Kafka
 
-**Redis:**
-- 기본 캐싱
-- Pub/Sub
-- Rate Limiting
-- Distributed Lock
-- Distributed Counter
+    Client->>Middleware: POST /documents
+    Middleware->>Middleware: Generate Request ID
+    Middleware->>Middleware: Start Tracing
+    Middleware->>Handler: Forward Request
 
-**Kafka:**
-- CDC (Change Data Capture)
-- 이벤트 소싱
-- 비동기 처리
-- 이벤트 재생
+    Handler->>Handler: Validate Request
+    Handler->>UseCase: Create(ctx, data)
 
-**Vault:**
+    UseCase->>UseCase: Create Entity
+    UseCase->>Repository: Save(doc)
+    Repository->>MongoDB: InsertOne(doc)
+    MongoDB-->>Repository: InsertedID
+    Repository-->>UseCase: Document
+
+    UseCase->>Kafka: PublishDocumentCreated(event)
+    Kafka-->>UseCase: Ack
+
+    UseCase-->>Handler: Response
+    Handler-->>Middleware: Response
+    Middleware->>Middleware: Log & Record Metrics
+    Middleware-->>Client: 201 Created
+```
+
+### 3. 캐시 조회 흐름
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Handler
+    participant UseCase
+    participant Cache
+    participant Repository
+    participant MongoDB
+
+    Client->>Handler: GET /documents/:id
+    Handler->>UseCase: GetByID(ctx, id)
+
+    UseCase->>Cache: Get(key)
+
+    alt Cache Hit
+        Cache-->>UseCase: Document
+        UseCase-->>Handler: Response
+        Handler-->>Client: 200 OK (from cache)
+    else Cache Miss
+        Cache-->>UseCase: Nil
+        UseCase->>Repository: FindByID(id)
+        Repository->>MongoDB: FindOne(id)
+        MongoDB-->>Repository: Document
+        Repository-->>UseCase: Document
+        UseCase->>Cache: Set(key, doc, TTL)
+        Cache-->>UseCase: OK
+        UseCase-->>Handler: Response
+        Handler-->>Client: 200 OK (from DB)
+    end
+```
+
+## 인프라스트럭처
+
+### MongoDB 고급 연산
+
+30+ 메서드를 지원하는 MongoDB 구현:
+
+- **기본 CRUD**: Save, FindByID, Update, Delete, FindAll, Count
+- **쿼리 연산**: FindWithOptions (Sort, Limit, Skip, Projection), Upsert, Replace
+- **벌크 연산**: SaveMany, UpdateMany, DeleteMany, BulkWrite
+- **원자적 연산**: FindAndUpdate, FindOneAndReplace, FindOneAndDelete
+- **집계**: Aggregate, Distinct, EstimatedDocumentCount
+- **인덱스 관리**: CreateIndex, CreateIndexes, DropIndex, ListIndexes
+- **컬렉션 관리**: CreateCollection, DropCollection, RenameCollection, ListCollections
+- **Change Streams**: Watch, WatchWithResumeToken
+
+### Vitess 고급 연산
+
+MongoDB와 동일한 30+ 메서드를 SQL로 구현:
+
+- **기본 CRUD**: INSERT, SELECT, UPDATE, DELETE
+- **쿼리 연산**: JSON_EXTRACT를 활용한 복잡한 쿼리
+- **벌크 연산**: 트랜잭션 기반 배치 처리
+- **원자적 연산**: SELECT FOR UPDATE (비관적 잠금)
+- **집계**: GROUP BY, COUNT, DISTINCT를 활용한 SQL 집계
+- **인덱스 관리**: ALTER TABLE을 통한 인덱스 관리
+- **컬렉션 관리**: 논리적 컬렉션 (collection 필드 사용)
+
+### Redis 확장 기능
+
+```mermaid
+graph TD
+    subgraph "Redis Extended"
+        A[Basic Cache<br/>Get, Set, Delete]
+        B[Pub/Sub<br/>Publisher/Subscriber]
+        C[Rate Limiting<br/>Token Bucket]
+        D[Distributed Lock<br/>Acquire/Release]
+        E[Distributed Counter<br/>Incr/Decr]
+    end
+
+    A --> REDIS[(Redis Cluster)]
+    B --> REDIS
+    C --> REDIS
+    D --> REDIS
+    E --> REDIS
+
+    style REDIS fill:#ffccbc
+```
+
+### Kafka CDC
+
+```mermaid
+graph LR
+    subgraph "Event Flow"
+        A[Document Update] --> B[Repository Save]
+        B --> C[Kafka Producer]
+        C --> D[documents.updated Topic]
+
+        D --> E[Consumer 1<br/>Analytics]
+        D --> F[Consumer 2<br/>Audit Log]
+        D --> G[Consumer 3<br/>Notification]
+        D --> H[Consumer 4<br/>Search Index]
+    end
+
+    style A fill:#e3f2fd
+    style C fill:#f8bbd0
+    style D fill:#f8bbd0
+    style E fill:#c8e6c9
+    style F fill:#c8e6c9
+    style G fill:#c8e6c9
+    style H fill:#c8e6c9
+```
+
+## 보안 (Vault Integration)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App
+    participant Vault
+    participant MongoDB
+    participant Vitess
+
+    App->>Vault: Authenticate (Token/AppRole/K8s SA)
+    Vault-->>App: Access Token
+
+    App->>Vault: Request MongoDB Credentials
+    Vault->>Vault: Generate Dynamic Credentials
+    Vault-->>App: {username, password, TTL}
+
+    App->>MongoDB: Connect (username, password)
+    MongoDB-->>App: Connection Established
+
+    App->>Vault: Request Vitess Credentials
+    Vault-->>App: {username, password, TTL}
+
+    App->>Vitess: Connect (username, password)
+    Vitess-->>App: Connection Established
+
+    Note over App,Vault: Auto-renewal before expiry
+
+    App->>Vault: Renew Lease
+    Vault-->>App: Lease Extended
+```
+
+**Vault 기능:**
 - 동적 자격증명 (MongoDB, Vitess)
-- 정적 시크릿
+- 정적 시크릿 (API Keys, Redis Password)
 - Transit 암호화
-- 자동 리스 갱신
-
-### 4. Interface Layer
-
-**HTTP API:**
-- RESTful API
-- Gin 프레임워크
-- Middleware stack:
-  - Request ID
-  - Logging
-  - Tracing
-  - Metrics
-  - Recovery
-  - CORS
-
-**gRPC API:**
-- Protocol Buffers
-- Interceptor stack:
-  - Logging
-  - Tracing
-  - Metrics
-  - Recovery
-  - Error Handling
-
-### 5. Observability
-
-**Logging:**
-- Zap (구조화된 로깅)
-- 일관된 필드 명명
-- 컨텍스트 전파
-
-**Tracing:**
-- OpenTelemetry
-- Jaeger
-- 분산 추적
-- Span 전파
-
-**Metrics:**
-- Prometheus
-- 자동 메트릭 수집
-- 커스텀 메트릭
-
-## 데이터 흐름
-
-### 1. 문서 생성 (Create)
-
-```
-1. Client Request (HTTP/gRPC)
-   ↓
-2. Middleware/Interceptor
-   - Request ID 생성
-   - 로깅 시작
-   - Tracing 시작
-   ↓
-3. Handler
-   - 요청 검증
-   - UseCase 호출
-   ↓
-4. UseCase
-   - 엔티티 생성
-   - Repository 호출
-   ↓
-5. Repository
-   - MongoDB/Vitess에 저장
-   - 버전 설정
-   ↓
-6. Event Publishing (optional)
-   - Kafka로 CDC 이벤트 발행
-   ↓
-7. Response
-   - 클라이언트에 응답
-   - 로깅 완료
-   - 메트릭 기록
-```
-
-### 2. 문서 조회 (Read with Cache)
-
-```
-1. Client Request
-   ↓
-2. UseCase
-   - 캐시 확인 (Redis)
-   ├─ Cache Hit → 즉시 반환
-   └─ Cache Miss ↓
-3. Repository
-   - MongoDB/Vitess에서 조회
-   ↓
-4. 캐시 저장
-   - Redis에 저장 (TTL 설정)
-   ↓
-5. Response
-```
-
-### 3. 이벤트 기반 아키텍처
-
-```
-Document Update
-   ↓
-Repository Save
-   ↓
-Kafka Producer → [documents.updated] Topic
-   ↓
-┌────────────────┬────────────────┬────────────────┐
-│  Consumer 1    │  Consumer 2    │  Consumer 3    │
-│  (Analytics)   │  (Audit Log)   │  (Notification)│
-└────────────────┴────────────────┴────────────────┘
-```
-
-## 보안
-
-### 1. Vault 통합
-
-**동적 자격증명:**
-- MongoDB: 1-24시간 TTL
-- Vitess: 1-24시간 TTL
-- 자동 로테이션
-- 만료 전 자동 갱신
-
-**정적 시크릿:**
-- API 키
-- JWT 시크릿
-- Redis 비밀번호
-
-**Transit 암호화:**
-- 민감한 데이터 암호화
-- 데이터베이스에 암호화된 상태로 저장
-- 필요할 때만 복호화
-
-### 2. 인증 & 인가
-
-- Token 인증
-- AppRole 인증 (프로덕션)
-- Kubernetes Service Account (K8s)
-
-### 3. TLS/SSL
-
-- Vault 통신 암호화
-- gRPC mTLS
-- 데이터베이스 연결 암호화
+- 자동 Lease 갱신
 
 ## 확장성
 
-### 1. 수평 확장
+### Horizontal Pod Autoscaler
 
-- Stateless 서비스
-- Kubernetes HPA (Horizontal Pod Autoscaler)
-- 3-10 replicas
+```mermaid
+graph TB
+    subgraph "Kubernetes HPA"
+        M[Metrics Server]
+        HPA[Horizontal Pod Autoscaler]
+    end
 
-### 2. 데이터베이스 확장
+    subgraph "Pods (3-10 replicas)"
+        P1[Pod 1]
+        P2[Pod 2]
+        P3[Pod 3]
+        PN[Pod N]
+    end
 
-**MongoDB:**
-- Replica Set
-- Sharding
-- Read Preference
+    M -->|CPU/Memory| HPA
+    HPA -->|Scale| P1
+    HPA -->|Scale| P2
+    HPA -->|Scale| P3
+    HPA -->|Scale| PN
 
-**Vitess:**
-- 자동 샤딩
-- 수평 확장
-- Query Routing
+    style HPA fill:#fff3e0
+```
 
-**Redis:**
-- Cluster Mode
-- Read Replicas
-- Sentinel
+## CI/CD 파이프라인
 
-### 3. 메시징 확장
+```mermaid
+graph LR
+    A[Git Push] --> B[Lint]
+    B --> C[Unit Tests]
+    C --> D[Integration Tests]
+    D --> E[Build Binaries]
+    E --> F[Build Docker Images]
+    F --> G{Environment}
 
-**Kafka:**
-- Partitioning
-- Consumer Groups
-- Replication
+    G -->|Develop| H[Deploy to Dev]
+    G -->|Main| I[Deploy to Staging]
+    G -->|Tag| J[Deploy to Production]
 
-## 장애 복구
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#fff3e0
+    style E fill:#f3e5f5
+    style F fill:#f3e5f5
+    style H fill:#c8e6c9
+    style I fill:#ffecb3
+    style J fill:#ffccbc
+```
 
-### 1. Circuit Breaker
+**CI/CD 단계:**
+1. **Lint**: golangci-lint 코드 품질 검사
+2. **Test**: 유닛 테스트 + 통합 테스트
+3. **Build**: Go 바이너리 빌드
+4. **Docker**: 멀티스테이지 Dockerfile
+5. **Deploy**: Kubernetes 배포 (Dev → Staging → Production)
 
-- 외부 서비스 호출 보호
-- 자동 복구
-- Fallback 전략
+## Observability
 
-### 2. Retry Logic
+```mermaid
+graph TB
+    subgraph "Application"
+        APP[Database Service]
+    end
 
-- 지수 백오프
-- Jitter
-- 최대 재시도 제한
+    subgraph "Observability Stack"
+        LOG[Zap Logger<br/>Structured Logging]
+        TRACE[OpenTelemetry<br/>Distributed Tracing]
+        METRIC[Prometheus<br/>Metrics]
+    end
 
-### 3. Graceful Shutdown
+    subgraph "Backends"
+        ELK[ELK Stack]
+        JAEGER[Jaeger]
+        GRAFANA[Grafana]
+    end
 
-- 진행 중인 요청 완료
-- 연결 정리
-- 리소스 해제
+    APP --> LOG
+    APP --> TRACE
+    APP --> METRIC
 
-## 성능 최적화
+    LOG --> ELK
+    TRACE --> JAEGER
+    METRIC --> GRAFANA
 
-### 1. 캐싱 전략
+    style APP fill:#e3f2fd
+    style LOG fill:#fff3e0
+    style TRACE fill:#f3e5f5
+    style METRIC fill:#ffecb3
+```
 
-- Redis L1 캐시
-- Application L2 캐시
-- Cache-Aside 패턴
-
-### 2. 연결 풀링
-
-- MongoDB: 100 connections
-- Vitess: 200 connections
-- Redis: 200 connections
-
-### 3. 벌크 작업
-
-- Batch Insert
-- Bulk Update
-- Ordered=false (MongoDB)
-
-## 모니터링 & 알림
-
-### 1. 메트릭
-
-- Request Rate
-- Error Rate
+**메트릭:**
+- Request Rate, Error Rate
 - Latency (p50, p95, p99)
 - DB Connection Pool
 - Cache Hit Rate
 - Kafka Lag
 
-### 2. 로그 집계
-
-- ELK Stack
-- Structured Logging
-- Correlation ID
-
-### 3. 알림
-
-- Prometheus Alertmanager
-- Slack/PagerDuty 통합
-- SLA 모니터링
-
-## 배포
-
-### 1. Kubernetes
-
-```yaml
-Deployment:
-  - Replicas: 3-10 (HPA)
-  - Resources:
-      CPU: 500m-2000m
-      Memory: 512Mi-2Gi
-  - Health Checks:
-      Liveness: /health
-      Readiness: /ready
-
-Service:
-  - HTTP: 8080
-  - gRPC: 9090
-  - Metrics: 9091
-
-Ingress:
-  - TLS Termination
-  - Load Balancing
-  - Rate Limiting
-```
-
-### 2. CI/CD
-
-- GitHub Actions
-- Docker Build
-- Kubernetes Deployment
-- Automated Testing
-- Canary Deployment
-
 ## 참고 자료
 
 - [Vault Integration Guide](./VAULT_INTEGRATION.md)
-- [API Documentation](./API.md)
-- [Deployment Guide](./DEPLOYMENT.md)
+- [GitLab CI/CD Configuration](../.gitlab-ci.yml)
+- [Kubernetes Deployments](../deployments/kubernetes/)
+- [Configuration Guide](../configs/)
+- [Complete Example](../examples/complete_example.go)

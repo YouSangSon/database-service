@@ -424,95 +424,10 @@ func (r *VitessRepository) WithTransaction(ctx context.Context, fn func(ctx cont
 	return nil
 }
 
-// 나머지 메서드는 기본 구현 제공 (필요시 확장)
-func (r *VitessRepository) SaveMany(ctx context.Context, docs []*entity.Document) error {
-	return fmt.Errorf("SaveMany not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) UpdateMany(ctx context.Context, collection string, filter map[string]interface{}, update map[string]interface{}) (int64, error) {
-	return 0, fmt.Errorf("UpdateMany not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) FindAndUpdate(ctx context.Context, collection, id string, update map[string]interface{}) (*entity.Document, error) {
-	return nil, fmt.Errorf("FindAndUpdate not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) FindOneAndReplace(ctx context.Context, collection, id string, replacement *entity.Document) (*entity.Document, error) {
-	return nil, fmt.Errorf("FindOneAndReplace not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) FindOneAndDelete(ctx context.Context, collection, id string) (*entity.Document, error) {
-	return nil, fmt.Errorf("FindOneAndDelete not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) DeleteMany(ctx context.Context, collection string, filter map[string]interface{}) (int64, error) {
-	return 0, fmt.Errorf("DeleteMany not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) Upsert(ctx context.Context, collection string, filter map[string]interface{}, update map[string]interface{}) (string, error) {
-	return "", fmt.Errorf("Upsert not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) FindWithOptions(ctx context.Context, collection string, filter map[string]interface{}, opts *repository.FindOptions) ([]*entity.Document, error) {
-	return nil, fmt.Errorf("FindWithOptions not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) Replace(ctx context.Context, collection, id string, replacement *entity.Document) error {
-	return fmt.Errorf("Replace not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) Aggregate(ctx context.Context, collection string, pipeline []interface{}) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("Aggregate not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) Distinct(ctx context.Context, collection, field string, filter map[string]interface{}) ([]interface{}, error) {
-	return nil, fmt.Errorf("Distinct not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) EstimatedDocumentCount(ctx context.Context, collection string) (int64, error) {
-	return 0, fmt.Errorf("EstimatedDocumentCount not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) BulkWrite(ctx context.Context, operations []*repository.BulkOperation) (*repository.BulkResult, error) {
-	return nil, fmt.Errorf("BulkWrite not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) CreateIndex(ctx context.Context, collection string, model repository.IndexModel) (string, error) {
-	return "", fmt.Errorf("CreateIndex not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) CreateIndexes(ctx context.Context, collection string, models []repository.IndexModel) ([]string, error) {
-	return nil, fmt.Errorf("CreateIndexes not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) DropIndex(ctx context.Context, collection, indexName string) error {
-	return fmt.Errorf("DropIndex not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) ListIndexes(ctx context.Context, collection string) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("ListIndexes not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) CreateCollection(ctx context.Context, name string) error {
-	return fmt.Errorf("CreateCollection not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) DropCollection(ctx context.Context, name string) error {
-	return fmt.Errorf("DropCollection not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) RenameCollection(ctx context.Context, oldName, newName string) error {
-	return fmt.Errorf("RenameCollection not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) ListCollections(ctx context.Context) ([]string, error) {
-	return nil, fmt.Errorf("ListCollections not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) CollectionExists(ctx context.Context, name string) (bool, error) {
-	return false, fmt.Errorf("CollectionExists not yet implemented for Vitess")
-}
-
-func (r *VitessRepository) Watch(ctx context.Context, collection string, pipeline []interface{}) (interface{}, error) {
-	return nil, fmt.Errorf("Watch not yet implemented for Vitess")
-}
+// Advanced operations are implemented in separate files:
+// - query_operations.go: FindWithOptions, Upsert, Replace
+// - bulk_operations.go: SaveMany, UpdateMany, DeleteMany, BulkWrite
+// - atomic_operations.go: FindAndUpdate, FindOneAndReplace, FindOneAndDelete
+// - aggregation_operations.go: Aggregate, Distinct, EstimatedDocumentCount
+// - index_operations.go: CreateIndex, CreateIndexes, DropIndex, ListIndexes
+// - collection_operations.go: CreateCollection, DropCollection, RenameCollection, ListCollections, CollectionExists, Watch
