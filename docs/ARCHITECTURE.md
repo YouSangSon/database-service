@@ -62,14 +62,14 @@ graph TB
     GRPC1 --> KAFKA
     GRPC1 --> VAULT
 
-    style REST fill:#e1f5ff
-    style GRPC fill:#e1f5ff
-    style LB fill:#fff4e6
-    style MONGO fill:#c8e6c9
-    style VITESS fill:#c8e6c9
-    style REDIS fill:#ffccbc
-    style KAFKA fill:#f8bbd0
-    style VAULT fill:#d1c4e9
+    style REST fill:#81d4fa
+    style GRPC fill:#81d4fa
+    style LB fill:#ffcc80
+    style MONGO fill:#81c784
+    style VITESS fill:#81c784
+    style REDIS fill:#ff8a65
+    style KAFKA fill:#f06292
+    style VAULT fill:#9575cd
 ```
 
 ## 계층 아키텍처 (Clean Architecture + DDD)
@@ -117,14 +117,14 @@ graph TD
     EV --> KAFKA_P
     UC --> VAULT_C
 
-    style HTTP fill:#e3f2fd
-    style GRPC fill:#e3f2fd
-    style UC fill:#fff3e0
-    style ENT fill:#f3e5f5
-    style REPO_IF fill:#f3e5f5
-    style MONGO_R fill:#e8f5e9
-    style VITESS_R fill:#e8f5e9
-    style REDIS_C fill:#fce4ec
+    style HTTP fill:#90caf9
+    style GRPC fill:#90caf9
+    style UC fill:#ffb74d
+    style ENT fill:#ce93d8
+    style REPO_IF fill:#ce93d8
+    style MONGO_R fill:#a5d6a7
+    style VITESS_R fill:#a5d6a7
+    style REDIS_C fill:#f48fb1
 ```
 
 ## 주요 컴포넌트
@@ -309,7 +309,7 @@ graph TD
     D --> REDIS
     E --> REDIS
 
-    style REDIS fill:#ffccbc
+    style REDIS fill:#ff8a65
 ```
 
 ### Kafka CDC
@@ -327,13 +327,13 @@ graph LR
         D --> H[Consumer 4<br/>Search Index]
     end
 
-    style A fill:#e3f2fd
-    style C fill:#f8bbd0
-    style D fill:#f8bbd0
-    style E fill:#c8e6c9
-    style F fill:#c8e6c9
-    style G fill:#c8e6c9
-    style H fill:#c8e6c9
+    style A fill:#90caf9
+    style C fill:#f06292
+    style D fill:#f06292
+    style E fill:#81c784
+    style F fill:#81c784
+    style G fill:#81c784
+    style H fill:#81c784
 ```
 
 ## 보안 (Vault Integration)
@@ -398,7 +398,7 @@ graph TB
     HPA -->|Scale| P3
     HPA -->|Scale| PN
 
-    style HPA fill:#fff3e0
+    style HPA fill:#ffb74d
 ```
 
 ## CI/CD 파이프라인
@@ -416,14 +416,14 @@ graph LR
     G -->|Main| I[Deploy to Staging]
     G -->|Tag| J[Deploy to Production]
 
-    style A fill:#e3f2fd
-    style B fill:#fff3e0
-    style C fill:#fff3e0
-    style E fill:#f3e5f5
-    style F fill:#f3e5f5
-    style H fill:#c8e6c9
-    style I fill:#ffecb3
-    style J fill:#ffccbc
+    style A fill:#90caf9
+    style B fill:#ffb74d
+    style C fill:#ffb74d
+    style E fill:#ce93d8
+    style F fill:#ce93d8
+    style H fill:#81c784
+    style I fill:#ffd54f
+    style J fill:#ff8a65
 ```
 
 **CI/CD 단계:**
@@ -461,10 +461,10 @@ graph TB
     TRACE --> JAEGER
     METRIC --> GRAFANA
 
-    style APP fill:#e3f2fd
-    style LOG fill:#fff3e0
-    style TRACE fill:#f3e5f5
-    style METRIC fill:#ffecb3
+    style APP fill:#90caf9
+    style LOG fill:#ffb74d
+    style TRACE fill:#ce93d8
+    style METRIC fill:#ffd54f
 ```
 
 **메트릭:**
