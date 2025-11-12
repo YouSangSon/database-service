@@ -1,0 +1,259 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database-service-api
+  namespace: database-service
+  labels:
+    app: database-service
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: database-service
+      component: api
+  template:
+    metadata:
+      labels:
+        app: database-service
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: database-service
+      containers:
+      - name: api
+        image: database-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: API_PORT
+          value: "8080"
+        - name: GRPC_PORT
+          value: "50051"
+        - name: DB_TYPE
+          value: "mongodb"
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: db_host
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: db_port
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-service-secret
+              key: db_username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-service-secret
+              key: db_password
+        - name: DB_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: db_database
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: redis_addr
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-service-secret
+              key: redis_password
+              optional: true
+        - name: JAEGER_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: jaeger_endpoint
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - database-service
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database-service-grpc
+  namespace: database-service
+  labels:
+    app: database-service
+    component: grpc
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: database-service
+      component: grpc
+  template:
+    metadata:
+      labels:
+        app: database-service
+        component: grpc
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: database-service
+      containers:
+      - name: grpc
+        image: database-service-grpc:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: grpc
+          containerPort: 50051
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: API_PORT
+          value: "8080"
+        - name: GRPC_PORT
+          value: "50051"
+        - name: DB_TYPE
+          value: "mongodb"
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: db_host
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: db_port
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-service-secret
+              key: db_username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-service-secret
+              key: db_password
+        - name: DB_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: db_database
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: redis_addr
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-service-secret
+              key: redis_password
+              optional: true
+        - name: JAEGER_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: database-service-config
+              key: jaeger_endpoint
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:50051"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:50051"]
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - database-service
+              topologyKey: kubernetes.io/hostname
