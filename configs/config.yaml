@@ -1,0 +1,162 @@
+# 데이터베이스 서비스 설정
+
+app:
+  name: "database-service"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+
+server:
+  http:
+    host: "0.0.0.0"
+    port: 8080
+    read_timeout: 30s
+    write_timeout: 30s
+    shutdown_timeout: 30s
+    max_request_size: 10485760  # 10MB
+    enable_cors: true
+    allowed_origins:
+      - "http://localhost:3000"
+      - "http://localhost:8080"
+
+  grpc:
+    host: "0.0.0.0"
+    port: 9090
+    max_recv_msg_size: 10485760  # 10MB
+    max_send_msg_size: 10485760  # 10MB
+    connection_timeout: 30s
+    enable_reflection: true
+
+# MongoDB 설정
+mongodb:
+  enabled: true
+  uri: "mongodb://localhost:27017"
+  database: "database_service"
+  max_pool_size: 100
+  min_pool_size: 10
+  max_connecting: 10
+  connect_timeout: 10s
+  timeout: 30s
+  use_vault: false
+  vault_path: "database/creds/mongodb-role"
+
+# Vitess 설정
+vitess:
+  enabled: false
+  host: "localhost"
+  port: 15306  # VTGate port
+  keyspace: "commerce"
+  username: "vt_app"
+  password: ""
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 10m
+  use_vault: false
+  vault_path: "database/creds/vitess-role"
+
+# Redis 설정
+redis:
+  enabled: true
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 100
+  min_idle_conns: 10
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+  use_vault: false
+  vault_path: "secret/data/redis"
+  enable_pubsub: true
+  pubsub_channels:
+    - "documents.events"
+    - "system.notifications"
+
+# Kafka 설정
+kafka:
+  enabled: false
+  brokers:
+    - "localhost:9092"
+  version: "3.6.0"
+  client_id: "database-service"
+
+  producer:
+    max_message_bytes: 1048576  # 1MB
+    required_acks: 1  # 0=NoResponse, 1=WaitForLocal, -1=WaitForAll
+    timeout: 10s
+    compression: "snappy"  # none, gzip, snappy, lz4, zstd
+    max_retries: 3
+    retry_backoff: 100ms
+    enable_idempotent: true
+
+  consumer:
+    group_id: "database-service-group"
+    auto_offset_reset: "earliest"  # earliest, latest
+    enable_auto_commit: true
+    auto_commit_interval: 1s
+    session_timeout: 10s
+    heartbeat_interval: 3s
+    max_processing_time: 1m
+
+  enable_cdc: true
+  cdc_topics:
+    document_created: "documents.created"
+    document_updated: "documents.updated"
+    document_deleted: "documents.deleted"
+
+# Vault 설정
+vault:
+  enabled: false
+  address: "http://localhost:8200"
+  token: ""  # 환경변수 VAULT_TOKEN 사용 권장
+  auth_method: "token"  # token, approle, kubernetes
+  role_id: ""
+  secret_id: ""
+  k8s_role: "database-service"
+  namespace: ""
+
+  tls:
+    enabled: false
+    skip_verify: false
+    ca_cert: ""
+    client_cert: ""
+    client_key: ""
+
+  paths:
+    mongodb: "database/creds/mongodb-role"
+    vitess: "database/creds/vitess-role"
+    redis: "secret/data/redis"
+    secrets: "secret/data/app"
+    transit: "transit"
+
+  renewal:
+    interval: 15m
+    renew_before_expiry: 5m
+    max_retries: 3
+    retry_interval: 5s
+
+  cache:
+    enabled: true
+    ttl: 5m
+
+# Observability 설정
+observability:
+  logging:
+    level: "debug"  # debug, info, warn, error
+    format: "json"  # json, console
+    output: "stdout"  # stdout, stderr, file path
+    development: true
+
+  tracing:
+    enabled: true
+    service_name: "database-service"
+    jaeger_endpoint: "http://localhost:14268/api/traces"
+    sampling_rate: 1.0  # 0.0 ~ 1.0
+
+  metrics:
+    enabled: true
+    port: 9091
+    path: "/metrics"

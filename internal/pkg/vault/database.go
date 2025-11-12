@@ -216,3 +216,30 @@ func (m *DatabaseCredentialsManager) Close(ctx context.Context) error {
 
 	return nil
 }
+
+// ===== Vitess Credentials =====
+
+// GetVitessCredentials는 Vitess 자격증명을 가져옵니다
+func (c *Client) GetVitessCredentials(ctx context.Context, path string) (username, password string, err error) {
+	metadata, err := c.GetDynamicSecret(ctx, path)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get vitess credentials: %w", err)
+	}
+
+	username, ok := metadata.Data["username"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("username not found in vitess credentials")
+	}
+
+	password, ok = metadata.Data["password"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("password not found in vitess credentials")
+	}
+
+	logger.Info(ctx, "vitess credentials retrieved",
+		logger.Field("username", username),
+		logger.Field("lease_duration", metadata.LeaseDuration),
+	)
+
+	return username, password, nil
+}

@@ -3,11 +3,14 @@ module github.com/YouSangSon/database-service
 go 1.24.7
 
 require (
+	github.com/IBM/sarama v1.43.3
 	github.com/gin-gonic/gin v1.11.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/vault/api v1.14.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redis/go-redis/v9 v9.7.0
+	github.com/spf13/viper v1.19.0
 	go.mongodb.org/mongo-driver v1.17.0
 	go.opentelemetry.io/otel v1.33.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
@@ -16,6 +19,7 @@ require (
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.10
+	vitess.io/vitess v0.21.0
 )
 
 require (
