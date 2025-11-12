@@ -10,11 +10,14 @@
 - ✅ **이벤트 기반**: Kafka CDC를 통한 확장 가능한 이벤트 기반 아키텍처
 - ✅ **SOLID 원칙**: 의존성 역전, 단일 책임 등 객체지향 설계 원칙 준수
 
-### 데이터베이스 지원
+### 데이터베이스 지원 (6개)
 - ✅ **MongoDB**: 30+ 고급 메서드 지원 (집계, 벌크 연산, 원자적 연산, 인덱스 관리, Change Streams 등)
+- ✅ **PostgreSQL**: 30+ 고급 메서드 지원 (JSONB 기반 유연한 문서 저장, 트랜잭션, 인덱스 관리)
+- ✅ **MySQL**: 30+ 고급 메서드 지원 (JSON 타입 지원, 트랜잭션, 인덱스 관리)
+- ✅ **Cassandra**: 20+ 메서드 지원 (분산 NoSQL, CQL, LWT)
+- ✅ **Elasticsearch**: 25+ 메서드 지원 (전문 검색, 집계, 인덱싱)
 - ✅ **Vitess**: 30+ 고급 메서드 지원 (MongoDB와 동일한 인터페이스로 SQL 구현)
-- ✅ **Raw Query 실행**: MongoDB RunCommand, Vitess SQL 직접 실행 지원
-- 🔜 **향후 지원 예정**: PostgreSQL, MySQL 등
+- ✅ **Raw Query 실행**: 각 DB별 네이티브 쿼리 실행 지원
 
 ### 인프라스트럭처
 - ✅ **Redis 확장 기능**: 캐싱, Pub/Sub, Rate Limiting, Distributed Lock, Counter
@@ -30,9 +33,8 @@
 - ✅ **Kubernetes 네이티브**: HPA(Horizontal Pod Autoscaler) 기반 자동 스케일링
 - ✅ **멀티 Pod 지원**: 3-10개 Pod 자동 확장 (CPU 70%, Memory 80% 기준)
 - ✅ **동시성 처리**: Goroutine 및 Context 기반 동시 요청 처리
-- ✅ **연결 풀링**: MongoDB, Vitess, Redis 연결 풀 최적화
+- ✅ **연결 풀링**: 6개 DB 모두 연결 풀 최적화
 - ✅ **분산 캐싱**: Redis 기반 캐시 히트율 향상
-- ✅ **Multi-tenancy**: 테넌트 격리, API Key 인증, Quota 관리, 4가지 Plan 지원
 
 ### 보안
 - ✅ **Vault 동적 자격증명**: MongoDB, Vitess 사용자 자동 생성/로테이션/삭제
@@ -69,7 +71,6 @@
 │   ├── domain/                           # 도메인 레이어 (DDD)
 │   │   ├── entity/                       # 도메인 엔티티 (Document)
 │   │   ├── repository/                   # 리포지토리 인터페이스
-│   │   ├── tenant/                       # 테넌트 도메인 모델
 │   │   └── valueobject/                  # 값 객체
 │   ├── application/                      # 애플리케이션 레이어
 │   │   ├── usecase/                      # 유즈케이스 (비즈니스 로직)
@@ -77,14 +78,17 @@
 │   ├── infrastructure/                   # 인프라 레이어
 │   │   ├── persistence/                  # 영속성
 │   │   │   ├── mongodb/                  # MongoDB 구현 (30+ 메서드)
+│   │   │   ├── postgresql/               # PostgreSQL 구현 (30+ 메서드)
+│   │   │   ├── mysql/                    # MySQL 구현 (30+ 메서드)
+│   │   │   ├── cassandra/                # Cassandra 구현 (20+ 메서드)
+│   │   │   ├── elasticsearch/            # Elasticsearch 구현 (25+ 메서드)
 │   │   │   └── vitess/                   # Vitess 구현 (30+ 메서드)
 │   │   ├── cache/                        # Redis 캐시 및 확장 기능
 │   │   ├── messaging/                    # Kafka 메시징
-│   │   ├── tenant/                       # 테넌트 저장소 구현
 │   │   └── monitoring/                   # 모니터링 (메트릭, 추적)
 │   ├── interfaces/                       # 인터페이스 레이어
 │   │   ├── http/                         # HTTP 핸들러 (Gin)
-│   │   │   └── middleware/               # HTTP 미들웨어 (로깅, 추적, 메트릭, 테넌트)
+│   │   │   └── middleware/               # HTTP 미들웨어 (로깅, 추적, 메트릭)
 │   │   └── grpc/                         # gRPC 핸들러
 │   │       └── interceptor/              # gRPC 인터셉터
 │   ├── config/                           # 설정 관리 (Viper)
@@ -137,8 +141,12 @@
 - **gRPC**: Protocol Buffers 기반 RPC
 - **Viper**: 설정 관리
 
-### 데이터베이스
+### 데이터베이스 (6개)
 - **MongoDB**: 7.0 (NoSQL 문서 데이터베이스)
+- **PostgreSQL**: 16 (관계형 DB, JSONB 지원)
+- **MySQL**: 8.0 (관계형 DB, JSON 지원)
+- **Cassandra**: 4.1 (분산 NoSQL, 컬럼 패밀리)
+- **Elasticsearch**: 8.11 (검색 엔진, 문서 저장소)
 - **Vitess**: MySQL 호환 분산 데이터베이스
 - **Redis**: 7.0 (캐시, Pub/Sub, Lock, Counter)
 
@@ -200,7 +208,7 @@ go mod verify
 # MongoDB, Redis 실행
 docker-compose up -d mongodb redis
 
-# 전체 스택 실행 (11개 서비스: MongoDB, Redis, Kafka, Vault, Prometheus, AlertManager, Grafana 등)
+# 전체 스택 실행 (15개 서비스: 6개 DB + Redis + Kafka + Vault + Prometheus + AlertManager + Grafana + App 등)
 docker-compose up -d
 
 # 모든 서비스 확인
@@ -269,23 +277,10 @@ kubectl get hpa -n production
 curl http://localhost:8080/health
 ```
 
-#### Multi-tenancy 사용
-모든 API 요청에 테넌트 헤더를 포함해야 합니다:
-
-```bash
-# 테넌트 ID 사용
--H "X-Tenant-ID: tenant123"
-
-# 또는 API Key 사용 (권장)
--H "X-API-Key: your-api-key"
-```
-
 #### 문서 생성 (MongoDB)
 ```bash
 curl -X POST http://localhost:8080/api/v1/documents \
   -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: default" \
-  -H "X-API-Key: your-api-key" \
   -d '{
     "collection": "users",
     "data": {
@@ -618,58 +613,6 @@ http://localhost:16686
 - **Secrets**: 민감 정보 Kubernetes Secrets 저장
 - **TLS/mTLS**: 통신 암호화 (Istio/Linkerd)
 
-## 🏢 Multi-tenancy
-
-Multi-tenancy 기능을 통해 여러 테넌트를 안전하게 격리하고 관리할 수 있습니다.
-
-### 테넌트 Plan
-
-4가지 Plan을 지원합니다:
-
-| Plan | 최대 문서 수 | 최대 저장 공간 | API 호출 (일일) | 컬렉션 수 | Rate Limit |
-|------|-------------|---------------|----------------|-----------|-----------|
-| Free | 1,000 | 100 MB | 10,000 | 3 | 60/분 |
-| Basic | 100,000 | 10 GB | 1,000,000 | 10 | 300/분 |
-| Professional | 10,000,000 | 1 TB | 10,000,000 | 50 | 1,000/분 |
-| Enterprise | 무제한 | 무제한 | 무제한 | 무제한 | 무제한 |
-
-### API Key 인증
-
-```bash
-# API Key 생성 (프로그래밍 방식)
-apiKey := tenant.GenerateAPIKey()
-
-# API 요청 시 사용
-curl -X POST http://localhost:8080/api/v1/documents \
-  -H "X-API-Key: your-api-key-here" \
-  -H "Content-Type: application/json" \
-  -d '{"collection": "users", "data": {...}}'
-```
-
-### Quota 관리
-
-각 테넌트는 자동으로 Quota가 체크됩니다:
-
-```go
-// Quota 초과 시 429 Too Many Requests 반환
-{
-  "error": "quota_exceeded",
-  "message": "Daily API call limit exceeded (10000/10000)",
-  "quota": {
-    "limit": 10000,
-    "used": 10000,
-    "reset_at": "2025-11-13T00:00:00Z"
-  }
-}
-```
-
-### 테넌트 격리
-
-- **데이터베이스 격리**: 각 테넌트는 별도의 MongoDB 데이터베이스 사용
-- **API Key 검증**: 모든 요청에 대해 API Key 검증
-- **Usage 추적**: 문서 수, 저장 공간, API 호출 수 실시간 추적
-- **Feature Flag**: Plan별 기능 활성화/비활성화
-
 ## 💾 백업 & 복원
 
 ### 자동 백업
@@ -837,12 +780,15 @@ MIT License
 
 ### ✅ 완료
 - [x] MongoDB 지원 (30+ 메서드)
+- [x] PostgreSQL 지원 (30+ 메서드, JSONB)
+- [x] MySQL 지원 (30+ 메서드, JSON)
+- [x] Cassandra 지원 (20+ 메서드)
+- [x] Elasticsearch 지원 (25+ 메서드)
 - [x] Vitess 지원 (30+ 메서드)
 - [x] Kafka CDC
 - [x] HashiCorp Vault 통합
 - [x] Redis 확장 기능
 - [x] GitLab CI/CD 파이프라인
-- [x] Multi-tenancy 지원 (API Key, Quota 관리, 4가지 Plan)
 - [x] Prometheus AlertManager (100+ 알림 규칙)
 - [x] Grafana Dashboards (Auto-provisioning)
 - [x] 부하 테스트 (k6 기반)
@@ -852,13 +798,12 @@ MIT License
 - [x] 벤치마크 테스트
 
 ### 🔜 향후 계획
-- [ ] PostgreSQL 네이티브 지원
-- [ ] MySQL 네이티브 지원
 - [ ] GraphQL API
 - [ ] Event Sourcing
 - [ ] CQRS 패턴
 - [ ] Service Mesh (Istio) 통합
 - [ ] WebSocket 실시간 알림
+- [ ] Multi-tenancy 지원
 
 ## 📚 참고 문서
 
