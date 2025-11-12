@@ -9,7 +9,7 @@ variables:
   DOCKER_TAG: "${CI_COMMIT_SHORT_SHA}"
 
   # Go configuration
-  GO_VERSION: "1.21"
+  GO_VERSION: "1.24"
   CGO_ENABLED: "0"
   GOOS: "linux"
   GOARCH: "amd64"

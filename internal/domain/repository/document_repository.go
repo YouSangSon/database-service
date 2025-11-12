@@ -164,6 +164,18 @@ type DocumentRepository interface {
 	// WithTransaction은 트랜잭션 내에서 함수를 실행합니다
 	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 
+	// ===== Raw Query Execution =====
+
+	// ExecuteRawQuery는 데이터베이스별 raw query를 실행합니다
+	// MongoDB: RunCommand를 사용하여 임의의 MongoDB 명령 실행
+	// Vitess: 임의의 SQL 쿼리 실행
+	ExecuteRawQuery(ctx context.Context, query interface{}) (interface{}, error)
+
+	// ExecuteRawQueryWithResult는 raw query를 실행하고 결과를 특정 타입으로 반환합니다
+	// MongoDB: bson.M 형태의 명령 실행
+	// Vitess: SQL 쿼리 실행 및 결과 반환
+	ExecuteRawQueryWithResult(ctx context.Context, query interface{}, result interface{}) error
+
 	// ===== 헬스체크 =====
 
 	// HealthCheck는 저장소의 상태를 확인합니다
