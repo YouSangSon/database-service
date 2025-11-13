@@ -14,6 +14,7 @@ import (
 	"github.com/YouSangSon/database-service/internal/config"
 	"github.com/YouSangSon/database-service/internal/infrastructure/cache"
 	"github.com/YouSangSon/database-service/internal/infrastructure/messaging/kafka"
+	"github.com/YouSangSon/database-service/internal/infrastructure/persistence"
 	"github.com/YouSangSon/database-service/internal/infrastructure/persistence/mongodb"
 	httpHandler "github.com/YouSangSon/database-service/internal/interfaces/http/handler"
 	"github.com/YouSangSon/database-service/internal/interfaces/http/router"
@@ -170,7 +171,18 @@ func main() {
 	)
 
 	// ============================================
-	// 7. Redis Cache Initialization
+	// 7. Repository Manager Setup
+	// ============================================
+	repoManager := persistence.NewRepositoryManager()
+
+	// Register MongoDB repository
+	if err := repoManager.RegisterMongoDB(mongoRepo); err != nil {
+		logger.Fatal(ctx, "failed to register mongodb repository", zap.Error(err))
+	}
+	logger.Info(ctx, "repository manager initialized with mongodb")
+
+	// ============================================
+	// 8. Redis Cache Initialization
 	// ============================================
 	redisCache, err := cache.NewRedisCache(ctx, &cache.Config{
 		Host:        cfg.Redis.Host,
@@ -191,7 +203,7 @@ func main() {
 	)
 
 	// ============================================
-	// 8. Kafka Producer Initialization (Optional)
+	// 9. Kafka Producer Initialization (Optional)
 	// ============================================
 	var kafkaProducer *kafka.Producer
 	var cdcPublisher *kafka.CDCPublisher
@@ -224,20 +236,20 @@ func main() {
 	}
 
 	// ============================================
-	// 9. UseCase Layer Initialization
+	// 10. UseCase Layer Initialization (with RepositoryManager)
 	// ============================================
-	documentUC := usecase.NewDocumentUseCase(mongoRepo, redisCache)
-	logger.Info(ctx, "use cases initialized")
+	documentUC := usecase.NewDocumentUseCaseWithManager(repoManager, redisCache)
+	logger.Info(ctx, "use cases initialized with repository manager")
 
 	// ============================================
-	// 10. HTTP Handlers Initialization
+	// 11. HTTP Handlers Initialization
 	// ============================================
 	documentHandler := httpHandler.NewDocumentHandler(documentUC)
 	healthHandler := httpHandler.NewHealthHandler(mongoRepo, redisCache, vaultClient, kafkaProducer)
 	logger.Info(ctx, "http handlers initialized")
 
 	// ============================================
-	// 11. Router Setup with all 36 endpoints
+	// 12. Router Setup with all 36 endpoints
 	// ============================================
 	r := router.SetupRouter(
 		documentUC,
@@ -252,7 +264,7 @@ func main() {
 	logger.Info(ctx, "router initialized with 36 REST API endpoints")
 
 	// ============================================
-	// 12. HTTP Server Configuration
+	// 13. HTTP Server Configuration
 	// ============================================
 	srv := &http.Server{
 		Addr:           fmt.Sprintf(":%d", cfg.Server.HTTP.Port),
@@ -276,7 +288,7 @@ func main() {
 	}()
 
 	// ============================================
-	// 13. Graceful Shutdown
+	// 14. Graceful Shutdown
 	// ============================================
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
