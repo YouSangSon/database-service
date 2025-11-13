@@ -45,12 +45,30 @@ func (rm *RepositoryManager) InitializeMongoDB(ctx context.Context, client *mong
 	return nil
 }
 
+// RegisterMongoDB registers an existing MongoDB repository
+func (rm *RepositoryManager) RegisterMongoDB(repo repository.DocumentRepository) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.mongoRepo = repo
+	return nil
+}
+
 // InitializePostgreSQL initializes PostgreSQL repository
 func (rm *RepositoryManager) InitializePostgreSQL(ctx context.Context, db *sql.DB) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
 	rm.postgresRepo = postgresql.NewPostgreSQLRepository(db)
+	return nil
+}
+
+// RegisterPostgreSQL registers an existing PostgreSQL repository
+func (rm *RepositoryManager) RegisterPostgreSQL(repo repository.DocumentRepository) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.postgresRepo = repo
 	return nil
 }
 
@@ -63,12 +81,30 @@ func (rm *RepositoryManager) InitializeMySQL(ctx context.Context, db *sql.DB) er
 	return nil
 }
 
+// RegisterMySQL registers an existing MySQL repository
+func (rm *RepositoryManager) RegisterMySQL(repo repository.DocumentRepository) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.mysqlRepo = repo
+	return nil
+}
+
 // InitializeCassandra initializes Cassandra repository
 func (rm *RepositoryManager) InitializeCassandra(ctx context.Context, session *gocql.Session, keyspace string) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
 	rm.cassandraRepo = cassandra.NewCassandraRepository(session, keyspace)
+	return nil
+}
+
+// RegisterCassandra registers an existing Cassandra repository
+func (rm *RepositoryManager) RegisterCassandra(repo repository.DocumentRepository) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.cassandraRepo = repo
 	return nil
 }
 
@@ -81,12 +117,30 @@ func (rm *RepositoryManager) InitializeElasticsearch(ctx context.Context, client
 	return nil
 }
 
+// RegisterElasticsearch registers an existing Elasticsearch repository
+func (rm *RepositoryManager) RegisterElasticsearch(repo repository.DocumentRepository) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.elasticsearchRepo = repo
+	return nil
+}
+
 // InitializeVitess initializes Vitess repository
 func (rm *RepositoryManager) InitializeVitess(ctx context.Context, db *sql.DB) error {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
 
 	rm.vitessRepo = vitess.NewVitessRepository(db)
+	return nil
+}
+
+// RegisterVitess registers an existing Vitess repository
+func (rm *RepositoryManager) RegisterVitess(repo repository.DocumentRepository) error {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	rm.vitessRepo = repo
 	return nil
 }
 

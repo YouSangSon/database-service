@@ -20,6 +20,13 @@ func (uc *DocumentUseCase) CreateIndex(ctx context.Context, req *dto.CreateIndex
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.CreateIndex")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 	)
@@ -35,7 +42,7 @@ func (uc *DocumentUseCase) CreateIndex(ctx context.Context, req *dto.CreateIndex
 
 	result, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		return retry.DoWithValue(ctx, uc.retryConfig, func(ctx context.Context) (string, error) {
-			return uc.docRepo.CreateIndex(ctx, req.Collection, indexModel)
+			return docRepo.CreateIndex(ctx, req.Collection, indexModel)
 		})
 	})
 
@@ -61,6 +68,13 @@ func (uc *DocumentUseCase) CreateIndex(ctx context.Context, req *dto.CreateIndex
 func (uc *DocumentUseCase) CreateIndexes(ctx context.Context, req *dto.CreateIndexesRequest) (*dto.CreateIndexesResponse, error) {
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.CreateIndexes")
 	defer span.End()
+
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
 
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
@@ -98,7 +112,7 @@ func (uc *DocumentUseCase) CreateIndexes(ctx context.Context, req *dto.CreateInd
 			Options: options,
 		}
 
-		indexName, err := uc.docRepo.CreateIndex(ctx, req.Collection, indexModel)
+		indexName, err := docRepo.CreateIndex(ctx, req.Collection, indexModel)
 		if err != nil {
 			logger.Warn(ctx, "failed to create index", zap.Error(err))
 			continue
@@ -122,6 +136,13 @@ func (uc *DocumentUseCase) DropIndex(ctx context.Context, req *dto.DropIndexRequ
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.DropIndex")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 		attribute.String("index_name", req.IndexName),
@@ -134,7 +155,7 @@ func (uc *DocumentUseCase) DropIndex(ctx context.Context, req *dto.DropIndexRequ
 
 	_, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		return nil, retry.Do(ctx, uc.retryConfig, func(ctx context.Context) error {
-			return uc.docRepo.DropIndex(ctx, req.Collection, req.IndexName)
+			return docRepo.DropIndex(ctx, req.Collection, req.IndexName)
 		})
 	})
 
@@ -159,6 +180,13 @@ func (uc *DocumentUseCase) ListIndexes(ctx context.Context, req *dto.ListIndexes
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.ListIndexes")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 	)
@@ -168,7 +196,7 @@ func (uc *DocumentUseCase) ListIndexes(ctx context.Context, req *dto.ListIndexes
 	)
 
 	result, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
-		return uc.docRepo.ListIndexes(ctx, req.Collection)
+		return docRepo.ListIndexes(ctx, req.Collection)
 	})
 
 	if err != nil {
@@ -210,6 +238,13 @@ func (uc *DocumentUseCase) CreateCollection(ctx context.Context, req *dto.Create
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.CreateCollection")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 	)
@@ -220,7 +255,7 @@ func (uc *DocumentUseCase) CreateCollection(ctx context.Context, req *dto.Create
 
 	_, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		return nil, retry.Do(ctx, uc.retryConfig, func(ctx context.Context) error {
-			return uc.docRepo.CreateCollection(ctx, req.Collection, req.Options)
+			return docRepo.CreateCollection(ctx, req.Collection, req.Options)
 		})
 	})
 
@@ -244,6 +279,13 @@ func (uc *DocumentUseCase) DropCollection(ctx context.Context, req *dto.DropColl
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.DropCollection")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 	)
@@ -254,7 +296,7 @@ func (uc *DocumentUseCase) DropCollection(ctx context.Context, req *dto.DropColl
 
 	_, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		return nil, retry.Do(ctx, uc.retryConfig, func(ctx context.Context) error {
-			return uc.docRepo.DropCollection(ctx, req.Collection)
+			return docRepo.DropCollection(ctx, req.Collection)
 		})
 	})
 
@@ -278,6 +320,13 @@ func (uc *DocumentUseCase) RenameCollection(ctx context.Context, req *dto.Rename
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.RenameCollection")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("old_name", req.OldName),
 		attribute.String("new_name", req.NewName),
@@ -290,7 +339,7 @@ func (uc *DocumentUseCase) RenameCollection(ctx context.Context, req *dto.Rename
 
 	_, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		return nil, retry.Do(ctx, uc.retryConfig, func(ctx context.Context) error {
-			return uc.docRepo.RenameCollection(ctx, req.OldName, req.NewName)
+			return docRepo.RenameCollection(ctx, req.OldName, req.NewName)
 		})
 	})
 
@@ -315,10 +364,17 @@ func (uc *DocumentUseCase) ListCollections(ctx context.Context, req *dto.ListCol
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.ListCollections")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	logger.Info(ctx, "listing collections")
 
 	result, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
-		return uc.docRepo.ListCollections(ctx, req.Filter)
+		return docRepo.ListCollections(ctx, req.Filter)
 	})
 
 	if err != nil {
@@ -351,6 +407,13 @@ func (uc *DocumentUseCase) CollectionExists(ctx context.Context, req *dto.Collec
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.CollectionExists")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 	)
@@ -360,7 +423,7 @@ func (uc *DocumentUseCase) CollectionExists(ctx context.Context, req *dto.Collec
 	)
 
 	result, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
-		return uc.docRepo.CollectionExists(ctx, req.Collection)
+		return docRepo.CollectionExists(ctx, req.Collection)
 	})
 
 	if err != nil {
@@ -386,6 +449,13 @@ func (uc *DocumentUseCase) ExecuteTransaction(ctx context.Context, req *dto.Exec
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.ExecuteTransaction")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.Int("operation_count", len(req.Operations)),
 	)
@@ -398,7 +468,7 @@ func (uc *DocumentUseCase) ExecuteTransaction(ctx context.Context, req *dto.Exec
 	var modifiedCount, deletedCount int64
 
 	// Execute transaction
-	err := uc.docRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+	err := docRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		for _, op := range req.Operations {
 			switch op.Type {
 			case "insert":
@@ -409,7 +479,7 @@ func (uc *DocumentUseCase) ExecuteTransaction(ctx context.Context, req *dto.Exec
 				if op.ID != "" {
 					doc.SetID(op.ID)
 				}
-				if err := uc.docRepo.Save(txCtx, doc); err != nil {
+				if err := docRepo.Save(txCtx, doc); err != nil {
 					return fmt.Errorf("failed to insert document: %w", err)
 				}
 				insertedIDs = append(insertedIDs, doc.ID())
@@ -417,12 +487,12 @@ func (uc *DocumentUseCase) ExecuteTransaction(ctx context.Context, req *dto.Exec
 			case "update":
 				var err error
 				if op.ID != "" {
-					_, err = uc.docRepo.FindAndUpdate(txCtx, op.Collection, op.ID, op.Update)
+					_, err = docRepo.FindAndUpdate(txCtx, op.Collection, op.ID, op.Update)
 					if err == nil {
 						modifiedCount++
 					}
 				} else {
-					result, err := uc.docRepo.UpdateMany(txCtx, op.Collection, op.Filter, op.Update)
+					result, err := docRepo.UpdateMany(txCtx, op.Collection, op.Filter, op.Update)
 					if err == nil {
 						modifiedCount += result.ModifiedCount
 					}
@@ -433,12 +503,12 @@ func (uc *DocumentUseCase) ExecuteTransaction(ctx context.Context, req *dto.Exec
 
 			case "delete":
 				if op.ID != "" {
-					if err := uc.docRepo.Delete(txCtx, op.Collection, op.ID); err != nil {
+					if err := docRepo.Delete(txCtx, op.Collection, op.ID); err != nil {
 						return fmt.Errorf("failed to delete document: %w", err)
 					}
 					deletedCount++
 				} else {
-					deleted, err := uc.docRepo.DeleteMany(txCtx, op.Collection, op.Filter)
+					deleted, err := docRepo.DeleteMany(txCtx, op.Collection, op.Filter)
 					if err != nil {
 						return fmt.Errorf("failed to delete documents: %w", err)
 					}
@@ -478,11 +548,18 @@ func (uc *DocumentUseCase) ExecuteRawQuery(ctx context.Context, req *dto.RawQuer
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.ExecuteRawQuery")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	logger.Info(ctx, "executing raw query")
 
 	result, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		var results interface{}
-		err := uc.docRepo.ExecuteRawQuery(ctx, req.Query, req.Parameters, &results)
+		err := docRepo.ExecuteRawQuery(ctx, req.Query, req.Parameters, &results)
 		return results, err
 	})
 
@@ -504,13 +581,20 @@ func (uc *DocumentUseCase) ExecuteRawQueryTyped(ctx context.Context, req *dto.Ra
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.ExecuteRawQueryTyped")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	logger.Info(ctx, "executing raw query with typed result",
 		zap.String("result_type", req.ResultType),
 	)
 
 	result, err := uc.circuitBreaker.Execute(ctx, func() (interface{}, error) {
 		var results interface{}
-		err := uc.docRepo.ExecuteRawQueryWithResult(ctx, req.Query, req.Parameters, &results)
+		err := docRepo.ExecuteRawQueryWithResult(ctx, req.Query, req.Parameters, &results)
 		return results, err
 	})
 
@@ -532,12 +616,19 @@ func (uc *DocumentUseCase) HealthCheck(ctx context.Context) (*dto.HealthCheckRes
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.HealthCheck")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	logger.Info(ctx, "performing health check")
 
 	services := make(map[string]string)
 
 	// Check database
-	if err := uc.docRepo.Ping(ctx); err != nil {
+	if err := docRepo.Ping(ctx); err != nil {
 		services["database"] = "unhealthy"
 		logger.Error(ctx, "database health check failed", zap.Error(err))
 	} else {
@@ -573,6 +664,13 @@ func (uc *DocumentUseCase) DatabaseHealth(ctx context.Context, req *dto.Database
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.DatabaseHealth")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("database_type", req.DatabaseType),
 	)
@@ -582,7 +680,7 @@ func (uc *DocumentUseCase) DatabaseHealth(ctx context.Context, req *dto.Database
 	)
 
 	start := time.Now()
-	err := uc.docRepo.Ping(ctx)
+	err := docRepo.Ping(ctx)
 	responseTime := time.Since(start).Milliseconds()
 
 	status := "healthy"
@@ -611,6 +709,13 @@ func (uc *DocumentUseCase) GetMetrics(ctx context.Context) (*dto.MetricsResponse
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.GetMetrics")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	logger.Info(ctx, "retrieving metrics")
 
 	// This is a placeholder implementation
@@ -633,6 +738,13 @@ func (uc *DocumentUseCase) GetDatabaseStats(ctx context.Context, req *dto.Databa
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.GetDatabaseStats")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("database_type", req.DatabaseType),
 	)
@@ -642,7 +754,7 @@ func (uc *DocumentUseCase) GetDatabaseStats(ctx context.Context, req *dto.Databa
 	)
 
 	// Get collections
-	collections, err := uc.docRepo.ListCollections(ctx, nil)
+	collections, err := docRepo.ListCollections(ctx, nil)
 	if err != nil {
 		logger.Warn(ctx, "failed to list collections", zap.Error(err))
 		collections = []string{}
@@ -670,6 +782,13 @@ func (uc *DocumentUseCase) GetCollectionStats(ctx context.Context, req *dto.Coll
 	ctx, span := tracing.StartSpan(ctx, "DocumentUseCase.GetCollectionStats")
 	defer span.End()
 
+	// Get repository based on database type in context
+	docRepo, err := uc.getRepository(ctx)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+		return nil, err
+	}
+
 	tracing.SetAttributes(ctx,
 		attribute.String("collection", req.Collection),
 	)
@@ -679,14 +798,14 @@ func (uc *DocumentUseCase) GetCollectionStats(ctx context.Context, req *dto.Coll
 	)
 
 	// Get document count
-	count, err := uc.docRepo.Count(ctx, req.Collection, nil)
+	count, err := docRepo.Count(ctx, req.Collection, nil)
 	if err != nil {
 		logger.Warn(ctx, "failed to count documents", zap.Error(err))
 		count = 0
 	}
 
 	// Get indexes
-	indexes, err := uc.docRepo.ListIndexes(ctx, req.Collection)
+	indexes, err := docRepo.ListIndexes(ctx, req.Collection)
 	if err != nil {
 		logger.Warn(ctx, "failed to list indexes", zap.Error(err))
 		indexes = []repository.IndexModel{}

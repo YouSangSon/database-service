@@ -10,13 +10,17 @@ import (
 
 // Config는 애플리케이션 전체 설정입니다
 type Config struct {
-	App        AppConfig        `mapstructure:"app"`
-	Server     ServerConfig     `mapstructure:"server"`
-	MongoDB    MongoDBConfig    `mapstructure:"mongodb"`
-	Vitess     VitessConfig     `mapstructure:"vitess"`
-	Redis      RedisConfig      `mapstructure:"redis"`
-	Kafka      KafkaConfig      `mapstructure:"kafka"`
-	Vault      VaultConfig      `mapstructure:"vault"`
+	App           AppConfig           `mapstructure:"app"`
+	Server        ServerConfig        `mapstructure:"server"`
+	MongoDB       MongoDBConfig       `mapstructure:"mongodb"`
+	PostgreSQL    PostgreSQLConfig    `mapstructure:"postgresql"`
+	MySQL         MySQLConfig         `mapstructure:"mysql"`
+	Cassandra     CassandraConfig     `mapstructure:"cassandra"`
+	Elasticsearch ElasticsearchConfig `mapstructure:"elasticsearch"`
+	Vitess        VitessConfig        `mapstructure:"vitess"`
+	Redis         RedisConfig         `mapstructure:"redis"`
+	Kafka         KafkaConfig         `mapstructure:"kafka"`
+	Vault         VaultConfig         `mapstructure:"vault"`
 	Observability ObservabilityConfig `mapstructure:"observability"`
 }
 
@@ -60,7 +64,10 @@ type GRPCServerConfig struct {
 type MongoDBConfig struct {
 	Enabled         bool          `mapstructure:"enabled"`
 	URI             string        `mapstructure:"uri"`
+	Host            string        `mapstructure:"host"`
 	Database        string        `mapstructure:"database"`
+	Username        string        `mapstructure:"username"`
+	Password        string        `mapstructure:"password"`
 	MaxPoolSize     uint64        `mapstructure:"max_pool_size"`
 	MinPoolSize     uint64        `mapstructure:"min_pool_size"`
 	MaxConnecting   uint64        `mapstructure:"max_connecting"`
@@ -68,6 +75,69 @@ type MongoDBConfig struct {
 	Timeout         time.Duration `mapstructure:"timeout"`
 	UseVault        bool          `mapstructure:"use_vault"`
 	VaultPath       string        `mapstructure:"vault_path"`
+}
+
+// PostgreSQLConfig는 PostgreSQL 설정입니다
+type PostgreSQLConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
+	Host            string        `mapstructure:"host"`
+	Port            int           `mapstructure:"port"`
+	User            string        `mapstructure:"user"`
+	Password        string        `mapstructure:"password"`
+	Database        string        `mapstructure:"database"`
+	SSLMode         string        `mapstructure:"sslmode"`
+	MaxOpenConns    int           `mapstructure:"max_open_conns"`
+	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
+	UseVault        bool          `mapstructure:"use_vault"`
+	VaultPath       string        `mapstructure:"vault_path"`
+}
+
+// MySQLConfig는 MySQL 설정입니다
+type MySQLConfig struct {
+	Enabled         bool          `mapstructure:"enabled"`
+	Host            string        `mapstructure:"host"`
+	Port            int           `mapstructure:"port"`
+	User            string        `mapstructure:"user"`
+	Password        string        `mapstructure:"password"`
+	Database        string        `mapstructure:"database"`
+	Charset         string        `mapstructure:"charset"`
+	ParseTime       bool          `mapstructure:"parse_time"`
+	MaxOpenConns    int           `mapstructure:"max_open_conns"`
+	MaxIdleConns    int           `mapstructure:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
+	UseVault        bool          `mapstructure:"use_vault"`
+	VaultPath       string        `mapstructure:"vault_path"`
+}
+
+// CassandraConfig는 Cassandra 설정입니다
+type CassandraConfig struct {
+	Enabled     bool     `mapstructure:"enabled"`
+	Hosts       []string `mapstructure:"hosts"`
+	Port        int      `mapstructure:"port"`
+	Keyspace    string   `mapstructure:"keyspace"`
+	Username    string   `mapstructure:"username"`
+	Password    string   `mapstructure:"password"`
+	Consistency string   `mapstructure:"consistency"`
+	NumConns    int      `mapstructure:"num_conns"`
+	Timeout     time.Duration `mapstructure:"timeout"`
+	UseVault    bool     `mapstructure:"use_vault"`
+	VaultPath   string   `mapstructure:"vault_path"`
+}
+
+// ElasticsearchConfig는 Elasticsearch 설정입니다
+type ElasticsearchConfig struct {
+	Enabled   bool     `mapstructure:"enabled"`
+	Addresses []string `mapstructure:"addresses"`
+	Username  string   `mapstructure:"username"`
+	Password  string   `mapstructure:"password"`
+	APIKey    string   `mapstructure:"api_key"`
+	CloudID   string   `mapstructure:"cloud_id"`
+	MaxRetries int     `mapstructure:"max_retries"`
+	UseVault  bool     `mapstructure:"use_vault"`
+	VaultPath string   `mapstructure:"vault_path"`
 }
 
 // VitessConfig는 Vitess 설정입니다
@@ -173,11 +243,15 @@ type VaultTLSConfig struct {
 
 // VaultPaths는 Vault 경로 설정입니다
 type VaultPaths struct {
-	MongoDB string `mapstructure:"mongodb"`
-	Vitess  string `mapstructure:"vitess"`
-	Redis   string `mapstructure:"redis"`
-	Secrets string `mapstructure:"secrets"`
-	Transit string `mapstructure:"transit"`
+	MongoDB       string `mapstructure:"mongodb"`
+	PostgreSQL    string `mapstructure:"postgresql"`
+	MySQL         string `mapstructure:"mysql"`
+	Cassandra     string `mapstructure:"cassandra"`
+	Elasticsearch string `mapstructure:"elasticsearch"`
+	Vitess        string `mapstructure:"vitess"`
+	Redis         string `mapstructure:"redis"`
+	Secrets       string `mapstructure:"secrets"`
+	Transit       string `mapstructure:"transit"`
 }
 
 // VaultRenewal는 Vault 갱신 설정입니다
@@ -289,6 +363,9 @@ func overrideFromEnv(config *Config) {
 	if val := viper.GetString("MONGODB_URI"); val != "" {
 		config.MongoDB.URI = val
 	}
+	if val := viper.GetString("MONGODB_HOST"); val != "" {
+		config.MongoDB.Host = val
+	}
 	if val := viper.GetString("MONGODB_DATABASE"); val != "" {
 		config.MongoDB.Database = val
 	}
@@ -297,6 +374,73 @@ func overrideFromEnv(config *Config) {
 	}
 	if val := viper.GetString("MONGODB_PASSWORD"); val != "" {
 		config.MongoDB.Password = val
+	}
+
+	// PostgreSQL 설정
+	if val := viper.GetString("POSTGRESQL_HOST"); val != "" {
+		config.PostgreSQL.Host = val
+	}
+	if val := viper.GetInt("POSTGRESQL_PORT"); val != 0 {
+		config.PostgreSQL.Port = val
+	}
+	if val := viper.GetString("POSTGRESQL_USER"); val != "" {
+		config.PostgreSQL.User = val
+	}
+	if val := viper.GetString("POSTGRESQL_PASSWORD"); val != "" {
+		config.PostgreSQL.Password = val
+	}
+	if val := viper.GetString("POSTGRESQL_DATABASE"); val != "" {
+		config.PostgreSQL.Database = val
+	}
+
+	// MySQL 설정
+	if val := viper.GetString("MYSQL_HOST"); val != "" {
+		config.MySQL.Host = val
+	}
+	if val := viper.GetInt("MYSQL_PORT"); val != 0 {
+		config.MySQL.Port = val
+	}
+	if val := viper.GetString("MYSQL_USER"); val != "" {
+		config.MySQL.User = val
+	}
+	if val := viper.GetString("MYSQL_PASSWORD"); val != "" {
+		config.MySQL.Password = val
+	}
+	if val := viper.GetString("MYSQL_DATABASE"); val != "" {
+		config.MySQL.Database = val
+	}
+
+	// Cassandra 설정
+	if val := viper.GetString("CASSANDRA_HOSTS"); val != "" {
+		hosts := strings.Split(val, ",")
+		config.Cassandra.Hosts = hosts
+	}
+	if val := viper.GetInt("CASSANDRA_PORT"); val != 0 {
+		config.Cassandra.Port = val
+	}
+	if val := viper.GetString("CASSANDRA_KEYSPACE"); val != "" {
+		config.Cassandra.Keyspace = val
+	}
+	if val := viper.GetString("CASSANDRA_USERNAME"); val != "" {
+		config.Cassandra.Username = val
+	}
+	if val := viper.GetString("CASSANDRA_PASSWORD"); val != "" {
+		config.Cassandra.Password = val
+	}
+
+	// Elasticsearch 설정
+	if val := viper.GetString("ELASTICSEARCH_ADDRESSES"); val != "" {
+		addresses := strings.Split(val, ",")
+		config.Elasticsearch.Addresses = addresses
+	}
+	if val := viper.GetString("ELASTICSEARCH_USERNAME"); val != "" {
+		config.Elasticsearch.Username = val
+	}
+	if val := viper.GetString("ELASTICSEARCH_PASSWORD"); val != "" {
+		config.Elasticsearch.Password = val
+	}
+	if val := viper.GetString("ELASTICSEARCH_API_KEY"); val != "" {
+		config.Elasticsearch.APIKey = val
 	}
 
 	// Vitess 설정
@@ -372,6 +516,30 @@ func (c *Config) Validate() error {
 	if c.MongoDB.Enabled {
 		if !c.MongoDB.UseVault && c.MongoDB.URI == "" {
 			return fmt.Errorf("mongodb.uri is required when vault is not used")
+		}
+	}
+
+	if c.PostgreSQL.Enabled {
+		if !c.PostgreSQL.UseVault && (c.PostgreSQL.Host == "" || c.PostgreSQL.Database == "") {
+			return fmt.Errorf("postgresql.host and postgresql.database are required when vault is not used")
+		}
+	}
+
+	if c.MySQL.Enabled {
+		if !c.MySQL.UseVault && (c.MySQL.Host == "" || c.MySQL.Database == "") {
+			return fmt.Errorf("mysql.host and mysql.database are required when vault is not used")
+		}
+	}
+
+	if c.Cassandra.Enabled {
+		if !c.Cassandra.UseVault && (len(c.Cassandra.Hosts) == 0 || c.Cassandra.Keyspace == "") {
+			return fmt.Errorf("cassandra.hosts and cassandra.keyspace are required when vault is not used")
+		}
+	}
+
+	if c.Elasticsearch.Enabled {
+		if !c.Elasticsearch.UseVault && len(c.Elasticsearch.Addresses) == 0 {
+			return fmt.Errorf("elasticsearch.addresses is required when vault is not used")
 		}
 	}
 
