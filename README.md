@@ -140,7 +140,8 @@
 │       └── hpa.yaml                      # HPA (3-10 replicas)
 ├── docs/                                 # 문서
 │   ├── ARCHITECTURE.md                   # 아키텍처 가이드 (Mermaid 다이어그램)
-│   ├── CLIENT_INTEGRATION.md             # 클라이언트 통합 가이드 (Go, Python, Node.js, Java)
+│   ├── CLIENT_INTEGRATION.md             # REST API 클라이언트 통합 가이드 (Go, Python, Node.js, Java)
+│   ├── GRPC_INTEGRATION.md               # gRPC 클라이언트 통합 가이드 (Go, Python, Node.js, Java)
 │   ├── REST_API_SPECIFICATION.md         # REST API 완벽 명세서 (36개 엔드포인트)
 │   ├── QUICKSTART.md                     # 빠른 시작 가이드
 │   └── VAULT_INTEGRATION.md              # Vault 통합 가이드
