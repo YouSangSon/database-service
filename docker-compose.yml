@@ -23,6 +23,95 @@ services:
       timeout: 5s
       retries: 5
 
+  postgresql:
+    image: postgres:16-alpine
+    container_name: database-service-postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: testdb
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    container_name: database-service-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cassandra:
+    image: cassandra:4.1
+    container_name: database-service-cassandra
+    ports:
+      - "9042:9042"  # CQL native transport
+      - "9160:9160"  # Thrift
+      - "7000:7000"  # Inter-node
+    environment:
+      CASSANDRA_CLUSTER_NAME: "DatabaseServiceCluster"
+      CASSANDRA_DC: "DC1"
+      CASSANDRA_RACK: "RACK1"
+      CASSANDRA_ENDPOINT_SNITCH: "GossipingPropertyFileSnitch"
+      MAX_HEAP_SIZE: "512M"
+      HEAP_NEWSIZE: "100M"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: database-service-elasticsearch
+    ports:
+      - "9200:9200"  # HTTP REST API
+      - "9300:9300"  # Transport
+    environment:
+      discovery.type: "single-node"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      cluster.name: "database-service-cluster"
+      node.name: "es-node-1"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - database-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   # ============================================
   # Cache & Storage
   # ============================================
@@ -387,6 +476,14 @@ services:
 
 volumes:
   mongodb_data:
+    driver: local
+  postgresql_data:
+    driver: local
+  mysql_data:
+    driver: local
+  cassandra_data:
+    driver: local
+  elasticsearch_data:
     driver: local
   redis_data:
     driver: local
