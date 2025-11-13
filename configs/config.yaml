@@ -40,6 +40,67 @@ mongodb:
   use_vault: false
   vault_path: "database/creds/mongodb-role"
 
+# PostgreSQL 설정
+postgresql:
+  enabled: false
+  host: "localhost"
+  port: 5432
+  user: "admin"
+  password: "password"
+  database: "testdb"
+  sslmode: "disable"  # disable, require, verify-ca, verify-full
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  conn_max_idle_time: 2m
+  use_vault: false
+  vault_path: "database/creds/postgresql-role"
+
+# MySQL 설정
+mysql:
+  enabled: false
+  host: "localhost"
+  port: 3306
+  user: "root"
+  password: "rootpassword"
+  database: "testdb"
+  charset: "utf8mb4"
+  parse_time: true
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 5m
+  conn_max_idle_time: 2m
+  use_vault: false
+  vault_path: "database/creds/mysql-role"
+
+# Cassandra 설정
+cassandra:
+  enabled: false
+  hosts:
+    - "localhost"
+  port: 9042
+  keyspace: "testdb"
+  username: ""
+  password: ""
+  consistency: "quorum"  # one, quorum, all, local_one, local_quorum
+  num_conns: 2  # per host
+  timeout: 10s
+  use_vault: false
+  vault_path: "database/creds/cassandra-role"
+
+# Elasticsearch 설정
+elasticsearch:
+  enabled: false
+  addresses:
+    - "http://localhost:9200"
+  username: ""
+  password: ""
+  api_key: ""
+  cloud_id: ""
+  max_retries: 3
+  use_vault: false
+  vault_path: "database/creds/elasticsearch-role"
+
 # Vitess 설정
 vitess:
   enabled: false
@@ -127,6 +188,10 @@ vault:
 
   paths:
     mongodb: "database/creds/mongodb-role"
+    postgresql: "database/creds/postgresql-role"
+    mysql: "database/creds/mysql-role"
+    cassandra: "database/creds/cassandra-role"
+    elasticsearch: "database/creds/elasticsearch-role"
     vitess: "database/creds/vitess-role"
     redis: "secret/data/redis"
     secrets: "secret/data/app"

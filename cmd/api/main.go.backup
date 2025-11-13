@@ -16,11 +16,12 @@ import (
 	"github.com/YouSangSon/database-service/internal/infrastructure/messaging/kafka"
 	"github.com/YouSangSon/database-service/internal/infrastructure/persistence/mongodb"
 	httpHandler "github.com/YouSangSon/database-service/internal/interfaces/http/handler"
-	"github.com/YouSangSon/database-service/internal/interfaces/http/router"
+	"github.com/YouSangSon/database-service/internal/interfaces/http/middleware"
 	"github.com/YouSangSon/database-service/internal/pkg/logger"
 	"github.com/YouSangSon/database-service/internal/pkg/metrics"
 	"github.com/YouSangSon/database-service/internal/pkg/tracing"
 	"github.com/YouSangSon/database-service/internal/pkg/vault"
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -237,26 +238,68 @@ func main() {
 	logger.Info(ctx, "http handlers initialized")
 
 	// ============================================
-	// 11. Router Setup with all 36 endpoints
+	// 11. Gin Router Setup
 	// ============================================
-	r := router.SetupRouter(
-		documentUC,
-		healthHandler,
-		redisCache,
-		m,
-		cfg.Observability.Tracing.Enabled,
-		cfg.Observability.Metrics.Enabled,
-		cfg.App.Environment,
-	)
+	if cfg.App.Environment == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
-	logger.Info(ctx, "router initialized with 36 REST API endpoints")
+	router := gin.New()
+
+	// Global Middlewares
+	router.Use(middleware.RequestID())
+	router.Use(middleware.Logger())
+	router.Use(middleware.Recovery())
+	router.Use(middleware.CORS())
+
+	if cfg.Observability.Tracing.Enabled {
+		router.Use(middleware.Tracing())
+	}
+
+	if cfg.Observability.Metrics.Enabled {
+		router.Use(middleware.Metrics(m))
+	}
+
+	// Extended Redis client for rate limiting
+	redisExtended := cache.NewRedisExtended(redisCache.Client())
+
+	// Apply rate limiting to API routes
+	apiRateLimit := middleware.RateLimit(redisExtended, 100, time.Minute)
 
 	// ============================================
-	// 12. HTTP Server Configuration
+	// 12. Routes Definition
+	// ============================================
+
+	// Health & Metrics Endpoints (no rate limit)
+	router.GET("/health", healthHandler.Health)
+	router.GET("/ready", healthHandler.Ready)
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// Swagger Documentation (uncomment after running swag init)
+	// router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// API v1 Group with rate limiting
+	v1 := router.Group("/api/v1")
+	v1.Use(apiRateLimit)
+	{
+		documents := v1.Group("/documents")
+		{
+			documents.POST("", documentHandler.Create)
+			documents.GET("/:collection/:id", documentHandler.GetByID)
+			documents.PUT("/:collection/:id", documentHandler.Update)
+			documents.DELETE("/:collection/:id", documentHandler.Delete)
+			documents.GET("/:collection", documentHandler.List)
+			documents.POST("/:collection/aggregate", documentHandler.Aggregate)
+			documents.POST("/raw-query", documentHandler.ExecuteRawQuery)
+		}
+	}
+
+	// ============================================
+	// 13. HTTP Server Configuration
 	// ============================================
 	srv := &http.Server{
 		Addr:           fmt.Sprintf(":%d", cfg.Server.HTTP.Port),
-		Handler:        r,
+		Handler:        router,
 		ReadTimeout:    cfg.Server.HTTP.ReadTimeout,
 		WriteTimeout:   cfg.Server.HTTP.WriteTimeout,
 		MaxHeaderBytes: 1 << 20, // 1 MB
@@ -276,7 +319,7 @@ func main() {
 	}()
 
 	// ============================================
-	// 13. Graceful Shutdown
+	// 14. Graceful Shutdown
 	// ============================================
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
