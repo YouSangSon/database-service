@@ -45,7 +45,7 @@ docker-compose logs -f api
 curl http://localhost:8080/health
 ```
 
-### 문서 생성
+### 문서 생성 (MongoDB - 기본값)
 ```bash
 curl -X POST http://localhost:8080/api/v1/documents \
   -H "Content-Type: application/json" \
@@ -74,6 +74,46 @@ curl -X POST http://localhost:8080/api/v1/documents \
   "version": 1
 }
 ```
+
+### 다른 데이터베이스 사용 (동적 선택)
+
+`X-Database-Type` 헤더를 추가하여 다른 데이터베이스를 사용할 수 있습니다:
+
+```bash
+# PostgreSQL 사용
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "Content-Type: application/json" \
+  -H "X-Database-Type: postgresql" \
+  -d '{
+    "collection": "users",
+    "data": {
+      "name": "Jane Doe",
+      "email": "jane@example.com"
+    }
+  }'
+
+# MySQL 사용
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "Content-Type: application/json" \
+  -H "X-Database-Type: mysql" \
+  -d '{
+    "collection": "products",
+    "data": {
+      "name": "Product A",
+      "price": 99.99
+    }
+  }'
+```
+
+**지원 데이터베이스:**
+- `mongodb` (기본값, 현재 활성화)
+- `postgresql` (설정에서 활성화 필요)
+- `mysql` (설정에서 활성화 필요)
+- `cassandra` (설정에서 활성화 필요)
+- `elasticsearch` (설정에서 활성화 필요)
+- `vitess` (설정에서 활성화 필요)
+
+> ⚠️ **참고**: 다른 데이터베이스를 사용하려면 `configs/config.yaml`에서 해당 데이터베이스를 활성화해야 합니다.
 
 ### 문서 조회
 ```bash

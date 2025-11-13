@@ -7,16 +7,33 @@
 ### 아키텍처
 - ✅ **DDD + Clean Architecture**: 도메인 주도 설계 및 4계층 아키텍처 (Domain, Application, Infrastructure, Interface)
 - ✅ **Repository Pattern**: 데이터베이스 추상화를 통한 구현체 교체 가능
+- ✅ **RepositoryManager Pattern**: 동적 멀티 데이터베이스 선택 및 관리
+- ✅ **Dynamic Database Selection**: `X-Database-Type` 헤더로 런타임에 데이터베이스 선택
 - ✅ **이벤트 기반**: Kafka CDC를 통한 확장 가능한 이벤트 기반 아키텍처
 - ✅ **SOLID 원칙**: 의존성 역전, 단일 책임 등 객체지향 설계 원칙 준수
 
 ### 데이터베이스 지원 (6개)
+
+**현재 활성화:**
 - ✅ **MongoDB**: 30+ 고급 메서드 지원 (집계, 벌크 연산, 원자적 연산, 인덱스 관리, Change Streams 등)
-- ✅ **PostgreSQL**: 30+ 고급 메서드 지원 (JSONB 기반 유연한 문서 저장, 트랜잭션, 인덱스 관리)
-- ✅ **MySQL**: 30+ 고급 메서드 지원 (JSON 타입 지원, 트랜잭션, 인덱스 관리)
-- ✅ **Cassandra**: 20+ 메서드 지원 (분산 NoSQL, CQL, LWT)
-- ✅ **Elasticsearch**: 25+ 메서드 지원 (전문 검색, 집계, 인덱싱)
-- ✅ **Vitess**: 30+ 고급 메서드 지원 (MongoDB와 동일한 인터페이스로 SQL 구현)
+  - 상태: **운영 중** (기본 데이터베이스)
+
+**설정에서 활성화 가능:**
+- ⚙️ **PostgreSQL**: 30+ 고급 메서드 지원 (JSONB 기반 유연한 문서 저장, 트랜잭션, 인덱스 관리)
+  - 상태: 리포지토리 구현 완료, `configs/config.yaml`에서 `postgresql.enabled: true` 설정 후 사용
+- ⚙️ **MySQL**: 30+ 고급 메서드 지원 (JSON 타입 지원, 트랜잭션, 인덱스 관리)
+  - 상태: 리포지토리 구현 완료, `configs/config.yaml`에서 `mysql.enabled: true` 설정 후 사용
+- ⚙️ **Cassandra**: 20+ 메서드 지원 (분산 NoSQL, CQL, LWT)
+  - 상태: 리포지토리 구현 완료, `configs/config.yaml`에서 `cassandra.enabled: true` 설정 후 사용
+- ⚙️ **Elasticsearch**: 25+ 메서드 지원 (전문 검색, 집계, 인덱싱)
+  - 상태: 리포지토리 구현 완료, `configs/config.yaml`에서 `elasticsearch.enabled: true` 설정 후 사용
+- ⚙️ **Vitess**: 30+ 고급 메서드 지원 (MongoDB와 동일한 인터페이스로 SQL 구현)
+  - 상태: 리포지토리 구현 완료, `configs/config.yaml`에서 `vitess.enabled: true` 설정 후 사용
+
+**공통 기능:**
+- ✅ **36개 REST API 엔드포인트**: 모든 데이터베이스에서 동일한 API 사용
+- ✅ **동적 선택**: `X-Database-Type` 헤더로 요청별 데이터베이스 선택
+- ✅ **RepositoryManager**: 멀티 데이터베이스 동시 실행 및 관리
 - ✅ **Raw Query 실행**: 각 DB별 네이티브 쿼리 실행 지원
 
 ### 인프라스트럭처
@@ -66,6 +83,8 @@
 .
 ├── cmd/                                  # 애플리케이션 진입점
 │   ├── api/                              # REST API 서버 (포트 8080)
+│   │   ├── main.go                       # 메인 진입점 (MongoDB 활성화)
+│   │   └── main_complete.go              # 6개 DB 모두 초기화 예제
 │   └── grpc/                             # gRPC 서버 (포트 9090)
 ├── internal/
 │   ├── domain/                           # 도메인 레이어 (DDD)
@@ -77,6 +96,7 @@
 │   │   └── dto/                          # 데이터 전송 객체
 │   ├── infrastructure/                   # 인프라 레이어
 │   │   ├── persistence/                  # 영속성
+│   │   │   ├── repository_manager.go     # RepositoryManager (멀티 DB 관리)
 │   │   │   ├── mongodb/                  # MongoDB 구현 (30+ 메서드)
 │   │   │   ├── postgresql/               # PostgreSQL 구현 (30+ 메서드)
 │   │   │   ├── mysql/                    # MySQL 구현 (30+ 메서드)
@@ -88,7 +108,10 @@
 │   │   └── monitoring/                   # 모니터링 (메트릭, 추적)
 │   ├── interfaces/                       # 인터페이스 레이어
 │   │   ├── http/                         # HTTP 핸들러 (Gin)
-│   │   │   └── middleware/               # HTTP 미들웨어 (로깅, 추적, 메트릭)
+│   │   │   ├── middleware/               # HTTP 미들웨어
+│   │   │   │   ├── database.go           # X-Database-Type 헤더 처리
+│   │   │   │   └── ...                   # 로깅, 추적, 메트릭
+│   │   │   └── router/                   # 라우터 (36개 엔드포인트)
 │   │   └── grpc/                         # gRPC 핸들러
 │   │       └── interceptor/              # gRPC 인터셉터
 │   ├── config/                           # 설정 관리 (Viper)
@@ -117,6 +140,9 @@
 │       └── hpa.yaml                      # HPA (3-10 replicas)
 ├── docs/                                 # 문서
 │   ├── ARCHITECTURE.md                   # 아키텍처 가이드 (Mermaid 다이어그램)
+│   ├── CLIENT_INTEGRATION.md             # 클라이언트 통합 가이드 (Go, Python, Node.js, Java)
+│   ├── REST_API_SPECIFICATION.md         # REST API 완벽 명세서 (36개 엔드포인트)
+│   ├── QUICKSTART.md                     # 빠른 시작 가이드
 │   └── VAULT_INTEGRATION.md              # Vault 통합 가이드
 ├── test/                                 # 테스트
 │   ├── integration/                      # 통합 테스트 (Testcontainers)
@@ -277,7 +303,7 @@ kubectl get hpa -n production
 curl http://localhost:8080/health
 ```
 
-#### 문서 생성 (MongoDB)
+#### 문서 생성 (MongoDB - 기본값)
 ```bash
 curl -X POST http://localhost:8080/api/v1/documents \
   -H "Content-Type: application/json" \
@@ -291,9 +317,57 @@ curl -X POST http://localhost:8080/api/v1/documents \
   }'
 ```
 
+#### 동적 데이터베이스 선택 (X-Database-Type 헤더)
+
+다른 데이터베이스를 사용하려면 `X-Database-Type` 헤더를 추가하세요:
+
+```bash
+# PostgreSQL 사용
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "Content-Type: application/json" \
+  -H "X-Database-Type: postgresql" \
+  -d '{
+    "collection": "users",
+    "data": {"name": "John Doe", "email": "john@example.com"}
+  }'
+
+# MySQL 사용
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "Content-Type: application/json" \
+  -H "X-Database-Type: mysql" \
+  -d '{
+    "collection": "users",
+    "data": {"name": "Jane Doe", "email": "jane@example.com"}
+  }'
+
+# Elasticsearch 사용 (전문 검색)
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "Content-Type: application/json" \
+  -H "X-Database-Type: elasticsearch" \
+  -d '{
+    "collection": "logs",
+    "data": {"message": "User logged in", "level": "info"}
+  }'
+```
+
+**지원 데이터베이스 타입:**
+- `mongodb` (기본값)
+- `postgresql`
+- `mysql`
+- `cassandra`
+- `elasticsearch`
+- `vitess`
+
+> ⚠️ **참고**: 데이터베이스를 사용하기 전에 `configs/config.yaml`에서 해당 데이터베이스를 활성화해야 합니다.
+
 #### 문서 조회
 ```bash
+# MongoDB에서 조회 (기본값)
 curl http://localhost:8080/api/v1/documents/users/{id}
+
+# PostgreSQL에서 조회
+curl http://localhost:8080/api/v1/documents/users/{id} \
+  -H "X-Database-Type: postgresql"
 ```
 
 #### 문서 업데이트
